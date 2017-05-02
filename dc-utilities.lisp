@@ -3,106 +3,6 @@
 ;; Stuff that should be a part of Common Lisp. These routines are
 ;; general enough to be needed in most of my programs.
 
-(defpackage :dc-utilities
-  (:use :cl :cl-ppcre :sb-thread :sb-ext)
-  (:import-from :ironclad
-                :ascii-string-to-byte-array
-                :byte-array-to-hex-string
-                :digest-sequence
-                :sha512)
-  (:export 
-   
-   λ
-   λ-
-   alist-values
-   bytes-to-uint
-   change-per-second
-   command-line-options
-   create-directory
-   cull-named-params
-   directory-exists
-   distinct-elements
-   ds
-   ds-clone
-   ds-from-json
-   ds-get
-   ds-keys
-   ds-list
-   ds-merge
-   ds-set
-   ds-to-json
-   ds-type
-   factorial
-   fast-compress
-   fast-decompress
-   fib
-   file-exists
-   file-extension
-   file-line-count
-   filter-file
-   flatten
-   freeze
-   freeze-n-spew
-   hash-keys
-   hash-string
-   hash-values
-   home-settings-file
-   home-based
-   index-values
-   interrupt-sleep
-   interruptible-sleep
-   join-paths
-   k-combination
-   load-settings
-   lof
-   log-entry
-   mark-time
-   memoize
-   memoize-with-limit
-   parse-number
-   path-only
-   range
-   read-one-line
-   read-settings-file
-   read-time
-   replace-regexs
-   scrape-string
-   sequence-bytes-to-uint
-   sequence-uint-to-bytes
-   setting
-   setting
-   shell-execute
-   shift
-   shuffle
-   slurp
-   slurp-binary
-   slurp-n-thaw
-   spew
-   split-n-trim
-   store-delete
-   store-fetch
-   store-path
-   store-save
-   temp-file-name
-   thaw
-   thread-pool-job-queue
-   thread-pool-progress
-   thread-pool-run-time
-   thread-pool-start
-   thread-pool-start-time
-   thread-pool-stop
-   thread-pool-stop-time
-   thread-pool-time-to-go
-   time-to-go
-   timestamp
-   to-ascii
-   trim
-   uint-to-bytes
-   unshift
-   verify-string
-   with-lines-in-file
-   ))
-
 (in-package :dc-utilities)
 
 (set-dispatch-macro-character #\# #\%
@@ -130,7 +30,7 @@
                (map 'string (lambda (c) (if (> (char-code c) 127) #\Space c)) a)
                (format nil "~a" a)))))
 
-(defun timestamp (&key 
+(defun timestamp (&key
                     (time (get-universal-time))
                     string
                     (format "Y-M-DTh:m:s"))
@@ -145,7 +45,7 @@
   (multiple-value-bind (second minute hour day month year)
       (decode-universal-time time)
     (let* ((space-string (if string (format nil " ~a" string) ""))
-           (parts (ds (list :map 
+           (parts (ds (list :map
                             "Y" (format nil "~d"     year)
                             "M" (format nil "~2,'0d" month)
                             "D" (format nil "~2,'0d" day)
@@ -209,7 +109,7 @@
 (defun join-paths (&rest path-parts)
   "Joins elements of path-parts into a file path, inserting slashes
    where necessary."
-  (let ((path (format nil "~{~a~^/~}" 
+  (let ((path (format nil "~{~a~^/~}"
                       (loop for part in path-parts collect
                            (regex-replace-all "^/|/$" part "")))))
     (format nil "~a~a"
@@ -224,10 +124,10 @@
 
 (defun create-directory (dir &key with-parents)
   (unless (directory-exists dir)
-    (when 
-        (zerop 
-         (length 
-          (shell-execute 
+    (when
+        (zerop
+         (length
+          (shell-execute
            "mkdir" (if with-parents (list "-p" dir) (list dir)))))
     dir)))
 
@@ -255,10 +155,10 @@
 (defun slurp (filename)
   "Reads a whole file and returns the data of the file as a string."
   (with-open-file (stream filename)
-    (let ((seq (make-array (file-length stream) 
+    (let ((seq (make-array (file-length stream)
                            :element-type 'character :fill-pointer t)))
       (handler-bind ((sb-int:stream-decoding-error
-                      (lambda (c) 
+                      (lambda (c)
                         (declare (ignore c))
                         (invoke-restart 'sb-int:attempt-resync))))
         (setf (fill-pointer seq) (read-sequence seq stream)))
@@ -266,7 +166,7 @@
 
 (defun slurp-binary (filename)
   "Reads a whole binary file and returns an array with the bytes."
-  (with-open-file (s filename :element-type 'unsigned-byte) 
+  (with-open-file (s filename :element-type 'unsigned-byte)
     (let ((seq (make-array (file-length s) :element-type 'unsigned-byte)))
       (read-sequence seq s)
       seq)))
@@ -276,7 +176,7 @@
                   (lambda (c)
                     (declare (ignore c))
                     (invoke-restart 'sb-int:attempt-resync))))
-    (loop 
+    (loop
        with eol = (case eol
                     (:dos (reverse '(#\Return #\Newline)))
                     (:unix '(#\Newline))
@@ -340,7 +240,7 @@
 (defun command-line-options (short-long-keyword-list)
   (loop for v in (cdr sb-ext:*posix-argv*)
      collect
-       (loop named slk-loop for slk in short-long-keyword-list 
+       (loop named slk-loop for slk in short-long-keyword-list
           when (member v slk :test 'equal) do (return-from slk-loop (third slk))
           finally (return-from slk-loop v))))
 
@@ -476,8 +376,8 @@
 
 (defun ds-keys (ds &optional parent-keys)
   (case (ds-type ds)
-    (hash-table 
-     (loop for k being the hash-keys in ds 
+    (hash-table
+     (loop for k being the hash-keys in ds
         for new-parent-keys = (append parent-keys (list k))
         for child-ds = (gethash k ds)
         for child-keys = (ds-keys child-ds new-parent-keys)
@@ -492,7 +392,7 @@
 (defun ds-type (ds)
   (let* ((a (type-of ds))
          (b (string-downcase (format nil "~a" a))))
-    (cond ((ppcre:scan 
+    (cond ((ppcre:scan
             "simple-array character|vector character"
             b)
            'string)
@@ -555,7 +455,7 @@
             do (setf (elt ds-new i) (ds-clone (elt ds i)))
             finally (return ds-new))))
     (t ds)))
-       
+
 (defun ds-list (ds)
   (case (ds-type ds)
     (hash-table
@@ -569,7 +469,7 @@
      (map 'string 'identity (copy-seq ds)))
     (sequence
      (if (equal (type-of ds) 'cons)
-         (loop 
+         (loop
             with list = (list :list)
             for a in ds
             do (push (ds-list a) list)
@@ -607,12 +507,12 @@
     (otherwise
      (let ((v (if (and ds (symbolp ds)) (string-downcase (format nil "~a" ds)) ds)))
        (format nil
-               (cond 
+               (cond
                  ((floatp v) "~,9f")
                  ((numberp v) "~a")
                  ((null v) "null")
                  (t "~s")) v)))))
-                  
+
 
 (defun hash-string (password)
   "Hash a password and return a hex representation of the hash"
@@ -692,7 +592,7 @@
 (defun job-queue (pool-name)
   (getf *dc-job-queue* pool-name))
 
-(defun thread-pool-start 
+(defun thread-pool-start
     (pool-name thread-count job-queue fn-job &optional fn-finally)
   "Starts thread-count threads using pool-name to name the threads and
 runs fn-job with those threads.  Each thread runs fn-job, which takes
@@ -729,7 +629,7 @@ a sum of the return values of all the threads that ran."
                      (loop for job = (funcall get-job)
                         while job
                         do (funcall fn-job job)
-                          (with-mutex 
+                          (with-mutex
                               ((getf *dc-progress-mutex* pool-name))
                             (incf (getf *dc-thread-pool-progress* pool-name)))
                         summing 1))
@@ -745,8 +645,8 @@ a sum of the return values of all the threads that ran."
    :name (format nil "~a-000" pool-name)))
 
 (defun thread-pool-stop (pool-name)
-  (loop for threads = (remove-if-not 
-                       (lambda (x) 
+  (loop for threads = (remove-if-not
+                       (lambda (x)
                          (scan (format nil "^~a" pool-name)
                                (sb-thread:thread-name x)))
                        (sb-thread:list-all-threads))
@@ -786,7 +686,7 @@ a sum of the return values of all the threads that ran."
          (equal (file-namestring path) ""))))
 
 (defun file-extension (path)
-  (multiple-value-bind (a b) 
+  (multiple-value-bind (a b)
       (ppcre:scan-to-strings "\\.([a-z0-9]+)$" path)
     (when a (aref b 0))))
 
@@ -816,7 +716,7 @@ a sum of the return values of all the threads that ran."
     (when article
       (delete-file abs-filename)
       article)))
-    
+
 (defun uint-to-bytes (i &optional (size 4))
   (loop with ff = 255
      for a = i then (ash a -8)
