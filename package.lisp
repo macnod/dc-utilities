@@ -1,7 +1,7 @@
 ;;;; package.lisp
 
 (defpackage :dc-utilities
-  (:use :cl :cl-ppcre :sb-thread :sb-ext)
+  (:use :cl :cl-ppcre :trivial-utf-8 :sb-thread :sb-ext)
   (:import-from :ironclad
                 :ascii-string-to-byte-array
                 :byte-array-to-hex-string
@@ -9,8 +9,6 @@
                 :sha512)
   (:export
 
-   λ
-   λ-
    alist-values
    bytes-to-uint
    change-per-second
