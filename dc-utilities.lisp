@@ -282,11 +282,11 @@
      do (setf (aref w i) (aref w r)) (setf (aref w r) h)
      finally (return (if (listp seq) (map 'list 'identity w) w))))
 
-(defun memoize (f)
+(defun memoize (function-symbol)
   "Incorporate caching into a function, so that when the function is called with the same parameter a second time, it can retrieve the result from the cache instead of having to compute the result again."
   (let ((cache (make-hash-table :test 'equal))
-        (g (symbol-function f)))
-    (setf (symbol-function f)
+        (g (symbol-function function-symbol)))
+    (setf (symbol-function function-symbol)
           (lambda (&rest p)
             (let ((v (gethash p cache)))
               (if v v (setf (gethash p cache)
@@ -890,6 +890,23 @@ or like this:
   (/ (- (get-internal-real-time) (gethash tag *dc-timings*))
      (float internal-time-units-per-second)))
 
-;; (defun document-package (package)
-;;   (loop for function being the external-symbols of (find-package package)
-;;        collect (list :function function :documentation (document-function
+(defun document-package (package output-filename)
+  (loop for function being the external-symbols of (find-package package)
+     when (and (fboundp function) (documentation (symbol-function function) t))
+     collect
+       (list :function function
+             :function-name (string-downcase function)
+             :documentation (documentation (symbol-function function) t))
+     into functions
+     finally
+       (return (loop for function in 
+                    (sort functions #'string<
+                          :key (lambda (x) (getf x :function-name)))
+                    collect (format nil "## ~a ~a~%~a"
+                                    (getf function :function-name)
+                                    (sb-introspect:function-lambda-list
+                                     (symbol-function (getf function :function)))
+                                    (getf function :documentation))
+                    into function-docs
+                    finally (spew (format nil "~{~a~^~%~%~}" function-docs)
+                                  output-filename)))))
