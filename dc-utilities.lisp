@@ -889,3 +889,7 @@ or like this:
   "Reads the time that was marked with the given tag. See the mark-time function."
   (/ (- (get-internal-real-time) (gethash tag *dc-timings*))
      (float internal-time-units-per-second)))
+
+;; (defun document-package (package)
+;;   (loop for function being the external-symbols of (find-package package)
+;;        collect (list :function function :documentation (document-function

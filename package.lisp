@@ -27,6 +27,7 @@
    ds-set
    ds-to-json
    ds-type
+   document-package
    factorial
    fast-compress
    fast-decompress
