@@ -59,11 +59,11 @@
 (defun replace-regexs (text list-of-regex-replacement-pairs &key ignore-case)
   "Searches through text for substrings that match the regexs in list-of-regex-replacements and replaces those substrings with the corresponding replacements in list-of-regex-replacements.  Use the ignore-case parameter if you want case-insensitive matches.  Here's an example:
 
-(replace-regexs
-     \"She was beautiful.  She was smart.  She was sexy\"
-     '((\"sh[aeiou]\" \"Tracy\")
-       (\"wa[a-z]\" \"is\"))
-     :ignore-case t)
+    (replace-regexs
+         \"She was beautiful.  She was smart.  She was sexy\"
+         '((\"sh[aeiou]\" \"Tracy\")
+           (\"wa[a-z]\" \"is\"))
+         :ignore-case t)
 
 ==> \"Tracy is beautiful.  Tracy is smart.  Tracy is sexy\""
   (let ((ttext text))
@@ -250,9 +250,9 @@
 (defun split-n-trim (string &optional (splitter-regex "\s+"))
   "Splits a string into substrings on splitter-regex, then trims whitespace from the beginning and end of each substring.  The splitter-regex parameter value, which is optional, defaults to \\s+, which is to say that the string is split into a list of words at the whitespace boundaries.  Here's an example:
 
-(split-n-trim \"Hello  beautiful      world!\")
+    (split-n-trim \"Hello  beautiful      world!\")
 
-=> '(\"Hello\" \"beautiful\" \"world!\")"
+    => '(\"Hello\" \"beautiful\" \"world!\")"
   (remove-if (lambda (s) (zerop (length s)))
              (mapcar #'trim (split splitter-regex string))))
 
@@ -326,11 +326,11 @@
 (defun cull-named-params (named-params cull-keys)
   "Given a list of named parameters like this one
 
-'(:one 1 :two 2 :three 3)
+    '(:one 1 :two 2 :three 3)
 
 and a list of cull-keys like this one
 
-'(:one :two)
+    '(:one :two)
 
 this function returns a list of named parameters that excludes the names (and their values) that match the names in cull-keys."
   (let ((cull-keys (if (listp cull-keys) cull-keys (list cull-keys))))
@@ -364,8 +364,8 @@ this function returns a list of named parameters that excludes the names (and th
 (defun ds (list-or-atom &optional type)
   "Create a dc-utilities nested data structure.  Each node in the data structure can be a scalar value or object, a map (hash table), an array, or a list.  Here's an example:
 
-(ds '(:array (:map :name \"Donnie\" :age 50 :height \"6'4\" :weight 225)
-             (:map :name \"Tracy\" :age 45 :height \"5'0'\" :weight 120)))
+    (ds '(:array (:map :name \"Donnie\" :age 50 :height \"6'4\" :weight 225)
+                 (:map :name \"Tracy\" :age 45 :height \"5'0'\" :weight 120)))
 
 When you create a dc-utilities data structure like the one above, you can use other data-structure functions to easily access and manipulate the data."
   (let ((l (if (and type (listp list-or-atom) (not (null list-or-atom)))
@@ -388,19 +388,19 @@ When you create a dc-utilities data structure like the one above, you can use ot
 (defun ds-get (ds &rest keys)
   "Get a node (a leaf or a subtree) of ds, a dc-utilities data structure.  The parameters that follow ds describe the path to the node.  For example, given the following data structure in bogus-ds:
 
-(ds '(:array (:map :name \"Donnie\" :age 50 :height \"6'4\" :weight 225)
-             (:map :name \"Tracy\" :age 45 :height \"5'0'\" :weight 120)))
+    (ds '(:array (:map :name \"Donnie\" :age 50 :height \"6'4\" :weight 225)
+                 (:map :name \"Tracy\" :age 45 :height \"5'0'\" :weight 120)))
 
 You can get Tracy's weight like this:
 
-(ds-get bogus-ds 1 :weight)
+    (ds-get bogus-ds 1 :weight)
 
 or like this:
 
-(ds-get (elt (remove-if-not (lambda (x) (string= (ds-get x :name) \"Tracy\"))
-                            bogus-ds)
-             0)
-        :weight)"
+    (ds-get (elt (remove-if-not (lambda (x) (string= (ds-get x :name) \"Tracy\"))
+                                bogus-ds)
+                 0)
+            :weight)"
   (if keys
       (case (ds-type ds)
         (hash-table
