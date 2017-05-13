@@ -902,11 +902,16 @@ or like this:
        (return (loop for function in 
                     (sort functions #'string<
                           :key (lambda (x) (getf x :function-name)))
-                    collect (format nil "## ~a ~a~%~a"
-                                    (getf function :function-name)
-                                    (sb-introspect:function-lambda-list
-                                     (symbol-function (getf function :function)))
-                                    (getf function :documentation))
-                    into function-docs
+                  collect (format nil "## ~a ~a~%~a"
+                                  (string-downcase (getf function :function-name))
+                                  (string-downcase
+                                   (replace-regexs
+                                    (format nil "~s"
+                                            (sb-introspect:function-lambda-list
+                                             (symbol-function (getf function :function))))
+                                    '(("\\s\\s+" " ")
+                                      ("DC-UTILITIES::" ""))))
+                                  (getf function :documentation))
+                  into function-docs
                     finally (spew (format nil "~{~a~^~%~%~}" function-docs)
                                   output-filename)))))
