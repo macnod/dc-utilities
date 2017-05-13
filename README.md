@@ -207,7 +207,7 @@ Reads and brings to life serialized objects from a file.
 ## spew (string filename &key create-directories append)
 Writes the contents of string to the file specified by filename.
 
-## split-n-trim (string &optional (splitter-regex "s+"))
+## split-n-trim (string &optional (splitter-regex "\\s+"))
 Splits a string into substrings on splitter-regex, then trims whitespace from the beginning and end of each substring.  The splitter-regex parameter value, which is optional, defaults to \s+, which is to say that the string is split into a list of words at the whitespace boundaries.  Here's an example:
 
     (split-n-trim "Hello  beautiful      world!")
