@@ -34,7 +34,7 @@
 (defun timestamp (&key
                     (time (get-universal-time))
                     string
-                    (format "Y-M-DTh\:m\:s"))
+                    (format "Y-M-DTh:m:s"))
   "Returns the given time (or the current time) formatted according to the FORMAT parameter, followed by an optional value for STRING.  If STRING is provided, the function adds a space to the result and then appends the string to that.  The FORMAT string can contain any characters.  This function will replace the format characters Y, M, D, h, m, and s, respectively, with numbers representing the year,month, day, hour, minute, and second.  All the numbers are 2 digits long, except for the year, which is 4 digits long."
   (multiple-value-bind (second minute hour day month year)
       (decode-universal-time time)
@@ -917,5 +917,5 @@ or like this:
                                      ("DC-UTILITIES::" "")))
                                   (getf function :documentation))
                   into function-docs
-                    finally (spew (format nil "~{~a~^~%~%~}" function-docs)
+                    finally (spew (format nil "# ~a~%~{~a~^~%~%~}" package function-docs)
                                   output-filename)))))

@@ -1,3 +1,4 @@
+# DC-UTILITIES
 ## alist-values (ALIST &REST KEYS)
 Returns the values associated with KEYS in ALIST.  ALIST is an associative list.
 
@@ -264,7 +265,7 @@ Returns the amount of time left for the thread pool given by POOL-NAME to comple
 ## time-to-go (CHANGE-PER-SECOND RECORD-COUNT)
 Given the number of records per second that are being processed (given in CHANGE-PER-SECOND) and the nuber of records remaining (given in RECORD-COUNT), this function computes the amount of time still left before all the records have been processed.
 
-## timestamp (&KEY (TIME (GET-UNIVERSAL-TIME)) STRING (FORMAT "Y-M-DTh\\:m\\:s"))
+## timestamp (&KEY (TIME (GET-UNIVERSAL-TIME)) STRING (FORMAT "Y-M-DTh:m:s"))
 Returns the given time (or the current time) formatted according to the FORMAT parameter, followed by an optional value for STRING.  If STRING is provided, the function adds a space to the result and then appends the string to that.  The FORMAT string can contain any characters.  This function will replace the format characters Y, M, D, h, m, and s, respectively, with numbers representing the year,month, day, hour, minute, and second.  All the numbers are 2 digits long, except for the year, which is 4 digits long.
 
 ## to-ascii (S)
