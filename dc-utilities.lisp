@@ -296,8 +296,8 @@
   "Like memoize, but limits the size of the cache.  If more elements than LIMIT are cached when a new element needs to be cached, the oldest element is evicted from the cache to make room for the new one.  This is an excellent memoizing function to use when the function frequently returns a limited set of values, but has an infinite range."
   (let ((cache (make-hash-table :test 'equal :size limit))
         (fifo nil)
-        (g (symbol-function f)))
-    (setf (symbol-function f)
+        (g (symbol-function function-symbol)))
+    (setf (symbol-function function-symbol)
           (lambda (&rest p)
             (let ((v (gethash p cache)))
               (if v v (progn
