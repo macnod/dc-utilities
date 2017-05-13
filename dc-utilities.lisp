@@ -23,7 +23,7 @@
 (defparameter *dc-timings* (make-hash-table :test #'equal))
 
 (defun to-ascii (s)
-  "Converts the string s, which may contain non-ascii characters, into a string with nothing but ascii characters.  Non ascii characters are converted into spaces.  If s is a list, this function converts each element of the list into an all-ascii string."
+  "Converts the string S, which may contain non-ascii characters, into a string with nothing but ascii characters.  Non ascii characters are converted into spaces.  If S is a list, this function converts each element of the list into an all-ascii string."
   (if (atom s)
       (map 'string (lambda (c) (if (> (char-code c) 127) #\Space c)) s)
       (loop for a in s collect
@@ -35,7 +35,7 @@
                     (time (get-universal-time))
                     string
                     (format "Y-M-DTh:m:s"))
-  "Returns the give time (or the current time) formatted according to the format parameter, followed by an optional string.  If a string is provided, the function adds a space to the result and then appends the string to that.  The format string can contain any characters.  This function will replace the format characters Y, M,D, h, m, and s, respectively, with numbers representing the year,month, day, hour, minute, and second.  All the numbers are 2 digits long, except for the year, which is 4 digits long."
+  "Returns the given time (or the current time) formatted according to the FORMAT parameter, followed by an optional value for STRING.  If STRING is provided, the function adds a space to the result and then appends the string to that.  The FORMAT string can contain any characters.  This function will replace the format characters Y, M, D, h, m, and s, respectively, with numbers representing the year,month, day, hour, minute, and second.  All the numbers are 2 digits long, except for the year, which is 4 digits long."
   (multiple-value-bind (second minute hour day month year)
       (decode-universal-time time)
     (let* ((space-string (if string (format nil " ~a" string) ""))
@@ -57,7 +57,7 @@
   (timestamp :string (format nil "~{~a~}~%" messages)))
 
 (defun replace-regexs (text list-of-regex-replacement-pairs &key ignore-case)
-  "Searches through text for substrings that match the regexs in list-of-regex-replacements and replaces those substrings with the corresponding replacements in list-of-regex-replacements.  Use the ignore-case parameter if you want case-insensitive matches.  Here's an example:
+  "Searches through TEXT for substrings that match the regexs in LIST-OF-REGEX-REPLACEMENTS and replaces those substrings with the corresponding replacements in LIST-OF-REGEX-REPLACEMENTS.  Use the IGNORE-CASE parameter if you want case-insensitive matches.  Here's an example:
 
     (replace-regexs
          \"She was beautiful.  She was smart.  She was sexy\"
@@ -75,7 +75,7 @@
    ttext))
 
 (defun scrape-string (regex string &key ignore-case)
-  "Returns a list of the substrings in string that match regex.  Use the ignore-case parameter if you want case-insensitive matches."
+  "Returns a list of the substrings in STRING that match REGEX.  Use the IGNORE-CASE parameter if you want case-insensitive matches."
   (map 'list 'identity
        (multiple-value-bind (whole parts)
            (ppcre:scan-to-strings
@@ -85,7 +85,7 @@
          parts)))
 
 (defun verify-string (string regex &key ignore-case)
-  "Return t if the string matches the regex exactly.  Use the ignore-case parameter if you want case-insensitve matches."
+  "Return t if STRING matches the REGEX exactly.  Use the IGNORE-CASE parameter if you want case-insensitve matches."
   (multiple-value-bind (a b) 
       (scan 
        (if ignore-case (concatenate 'string "(?is)" regex) regex)
@@ -93,7 +93,7 @@
     (and a b (zerop a) (= b (length string)))))
 
 (defun shell-execute (program &optional (parameters nil) (input-pipe-data ""))
-  "Run shell program and return the output of the program as a string.  You can pass an atom or a list for parameters (the command-line options for the program). You can also pipe data to the program by passing the input-pipe-data parameter with a string containing the data you want to pipe."
+  "Run PROGRAM and return the output of the program as a string.  You can pass an atom or a list for PARAMETERS (the command-line options for the program). You can also pipe data to the program by passing the INPUT-PIPE-DATA parameter with a string containing the data you want to pipe."
   (let ((parameters (cond ((null parameters) nil)
                           ((atom parameters) (list parameters))
                           (t parameters))))
@@ -103,12 +103,12 @@
                             :output output-stream :input input-stream)))))
 
 (defun file-line-count (filename)
-  "Obtain a count of the lines in the given file using the wc program."
+  "Obtain a count of the lines in the file FILENAME using the Linux wc program."
   (values (parse-integer
            (shell-execute "wc" `("-l" ,filename)) :junk-allowed t)))
 
 (defmacro with-lines-in-file ((line filename) &body body)
-  "Runs body for each line in the file specified by filename."
+  "Sequentially assigns each line in the file given by FILENAME to LINE and runs BODY for each line."
   (let ((file (gensym)))
     `(with-open-file (,file ,filename)
       (do ((,line (read-line ,file nil) (read-line ,file nil)))
@@ -116,7 +116,7 @@
         ,@body))))
 
 (defun join-paths (&rest path-parts)
-  "Joins elements of path-parts into a file path, inserting slashes where necessary."
+  "Joins elements of PATH-PARTS into a file path, inserting slashes where necessary."
   (let ((path (format nil "~{~a~^/~}"
                       (loop for part in path-parts collect
                            (regex-replace-all "^/|/$" part "")))))
@@ -125,14 +125,14 @@
             path)))
 
 (defun path-only (filename)
-  "Retrieves the path (path only, without the filename) of the given filename."
+  "Retrieves the path (path only, without the filename) of FILENAME."
   (multiple-value-bind (match strings)
       (scan-to-strings "(.+)\/[^\/]*$" filename)
     (declare (ignore match))
     (if (null strings) "/" (elt strings 0))))
 
 (defun create-directory (dir &key with-parents)
-  "Works just like the mkdir shell command.  Use with-parents if you want the function to create parents as necessary."
+  "Works just like the mkdir shell command.  DIR is the directory you want to create. Use WITH-PARENTS if you want the function to create parent directories as necessary."
   (unless (directory-exists dir)
     (when
         (zerop
@@ -142,7 +142,7 @@
     dir)))
 
 (defmacro filter-file ((line input-filename output-filename) &body body)
-  "Copies lines from input to output, omitting lines for which body returns nil."
+  "Copies lines from the file INPUT-FILENAME to the file OUTPUT-FILENAME, omitting lines for which BODY returns nil."
   (let ((output (gensym))
         (transformed-line (gensym)))
     `(with-open-file (,output ,output-filename
@@ -153,15 +153,15 @@
            (when ,transformed-line (write-line ,transformed-line ,output)))))))
 
 (defun freeze (object)
-  "Serializes an object (or data structure) into a string, returning the string."
+  "Serializes OBJECT into a string, returning the string."
   (with-output-to-string (s) (write object :stream s :readably t)))
 
 (defun thaw (string)
-  "Deserializes an object (or data structure) from its string representation, returning the object."
+  "Deserializes an object (or data structure) from the string expression in STRING, returning the object."
   (with-input-from-string (s string) (read s)))
 
 (defun slurp (filename)
-  "Reads a whole file and returns the data of the file as a string."
+  "Reads the entire file FILENAME into a string and returns the string."
   (with-open-file (stream filename)
     (let ((seq (make-array (file-length stream)
                            :element-type 'character :fill-pointer t)))
@@ -173,14 +173,14 @@
       seq)))
 
 (defun slurp-binary (filename)
-  "Reads a whole binary file and returns an array with the bytes."
+  "Reads the entire binary file given by FILENAME and returns an array with the bytes of the file."
   (with-open-file (s filename :element-type 'unsigned-byte)
     (let ((seq (make-array (file-length s) :element-type 'unsigned-byte)))
       (read-sequence seq s)
       seq)))
 
 (defun read-one-line (stream &key (eol :unix) (max-length 500))
-  "Reads a single line from a stream and returns the line as a string."
+  "Reads a single line from STREAM and returns the line as a string.  You can specify the end-of-line character with EOL, which defaults to :unix.  The other option is :dos.  If no end-of-line character is found before the line reaches a length of MAX-LENGTH, a line of length MAX-LENGTH is returned."
   (handler-bind ((sb-int:stream-decoding-error
                   (lambda (c)
                     (declare (ignore c))
@@ -210,27 +210,27 @@
                                         (coerce (nreverse chars) 'string)))))))
 
 (defun spew (string filename &key create-directories append)
-  "Writes the contents of string to the file specified by filename."
+  "Writes the contents of STRING to the file specified by FILENAME.  Use the CREATE-DIRECTORIES parameter if any of the directories in the path in FILENAME don't exist and you want to create them.  Use the APPEND parameter if you want to append STRING to an existing file."
   (when create-directories
     (create-directory (directory-namestring filename) :with-parents t))
   (with-open-file (stream filename :direction :output :if-exists :supersede)
     (write-string string stream)))
 
 (defun slurp-n-thaw (filename)
-  "Reads and brings to life serialized objects from a file."
+  "Reads and brings to life serialized objects from the file FILENAME."
   (with-open-file (stream filename) (read stream)))
 
 (defun freeze-n-spew (object filename)
-  "Serializes an object into a string and writes the string to the file specified by filename."
+  "Serializes OBJECT into a string and writes the string to the file specified by FILENAME."
   (with-open-file (stream filename :direction :output :if-exists :supersede)
     (write object :stream stream :readably t)))
 
 (defun lof (filename)
-  "Returns the length of the given file."
+  "Returns the length of the file FILENAME."
   (with-open-file (f filename) (file-length f)))
 
 (defun unique-file-name (&key (directory "/tmp") (extension ".tmp"))
-  "Returns a made-up, unique file name.  The directory defaults to /tmp and the extension to .tmp, but you can also specify your own directory and extension."
+  "Returns a made-up, unique file name.  DIRECTORY defaults to /tmp and EXTENSION to .tmp."
   (join-paths
    directory
    (format nil "~a~a"
@@ -247,8 +247,8 @@
            (get-universal-time)
            (random 1000000000))))
 
-(defun split-n-trim (string &optional (splitter-regex "\s+"))
-  "Splits a string into substrings on splitter-regex, then trims whitespace from the beginning and end of each substring.  The splitter-regex parameter value, which is optional, defaults to \\s+, which is to say that the string is split into a list of words at the whitespace boundaries.  Here's an example:
+(defun split-n-trim (string &optional (splitter-regex "\\s+"))
+  "Splits STRING into substrings on SPLITTER-REGEX, then trims whitespace from the beginning and end of each substring.  The SPLITTER-REGEX parameter value, which is optional, defaults to \\s+, which is to say that the string is split into a list of words at the whitespace boundaries.  Here's an example:
 
     (split-n-trim \"Hello  beautiful      world!\")
 
@@ -257,11 +257,11 @@
              (mapcar #'trim (split splitter-regex string))))
 
 (defun trim (s &optional (fat "^\\s+|\\s+$"))
-  "Trim fat from the string.  The fat parameter is optional and defaults to \"^\\s+|\\s+$\", which means \"Whitespace at the beginning or end of the string\"."
+  "Trim FAT from the string in S.  The FAT parameter is optional and defaults to \"^\\s+|\\s+$\", which means \"Whitespace at the beginning or end of the string\"."
   (regex-replace-all fat s ""))
 
 (defun flatten (l)
-  "Given a nested list, return a flat list."
+  "Given a nested list L, return a flat list."
   (cond
     ((null l) nil)
     ((atom l) (list l))
@@ -275,7 +275,7 @@
           finally (return-from slk-loop v))))
 
 (defun shuffle (seq)
-  "Return a sequence with the same elements as the given sequence, but in random order (shuffled)."
+  "Return a sequence with the same elements as the given sequence S, but in random order (shuffled)."
   (loop
      with l = (length seq) with w = (make-array l :initial-contents seq)
      for i from 0 below l for r = (random l) for h = (aref w i)
@@ -283,7 +283,7 @@
      finally (return (if (listp seq) (map 'list 'identity w) w))))
 
 (defun memoize (function-symbol)
-  "Incorporate caching into a function, so that when the function is called with the same parameter a second time, it can retrieve the result from the cache instead of having to compute the result again."
+  "Incorporate caching into a function, specified by the symbol FUNCTION-SYMBOL, so that when the function is called with the same parameter a second time, it can retrieve the result from the cache instead of having to compute the result again."
   (let ((cache (make-hash-table :test 'equal))
         (g (symbol-function function-symbol)))
     (setf (symbol-function function-symbol)
@@ -292,8 +292,8 @@
               (if v v (setf (gethash p cache)
                             (apply g p))))))))
 
-(defun memoize-with-limit (f limit)
-  "Like memoize, but limits the size of the cache.  If more elements than limit are cached when a new element needs to be cached, the oldest element is evicted from the cache to make room for the new one."
+(defun memoize-with-limit (function-symbol limit)
+  "Like memoize, but limits the size of the cache.  If more elements than LIMIT are cached when a new element needs to be cached, the oldest element is evicted from the cache to make room for the new one.  This is an excellent memoizing function to use when the function frequently returns a limited set of values, but has an infinite range."
   (let ((cache (make-hash-table :test 'equal :size limit))
         (fifo nil)
         (g (symbol-function f)))
@@ -307,7 +307,7 @@
                         (setf (gethash p cache) (apply g p)))))))))
 
 (defun shift (list)
-  "This function is like the Common Lisp pop function, but takes an element from the end of the list instead of from the front of the list."
+  "This function is like the Common Lisp pop function, but takes an element from the end of LIST instead of from the front of LIST."
   (let ((value (car (last list))))
     (nbutlast list)
     value))
@@ -320,19 +320,21 @@
     (t (+ (fib (1- x)) (fib (- x 2))))))
 
 (defun alist-values (alist &rest keys)
-  "Returns the values in an alist."
+  "Returns the values associated with KEYS in ALIST.  ALIST is an associative list."
   (loop for key in keys collect (cdr (assoc key alist))))
 
 (defun cull-named-params (named-params cull-keys)
-  "Given a list of named parameters like this one
+  "Given a value for NAMED-PARAMS like this one
 
     '(:one 1 :two 2 :three 3)
 
-and a list of cull-keys like this one
+and a list of CULL-KEYS like this one
 
     '(:one :two)
 
-this function returns a list of named parameters that excludes the names (and their values) that match the names in cull-keys."
+this function returns a list of named parameters that excludes the names (and their values) that match the names in CULL-KEYS.  In the above example, the result is
+
+    '(:three 3)" 
   (let ((cull-keys (if (listp cull-keys) cull-keys (list cull-keys))))
     (loop for key in
          (remove-if (lambda (x) (member x cull-keys))
@@ -341,15 +343,15 @@ this function returns a list of named parameters that excludes the names (and th
          appending (list key (getf named-params key)))))
 
 (defun hash-keys (hash)
-  "Returns a list of all the keys in the given hash table."
+  "Returns a list of all the keys in HASH, which is a hash table."
   (loop for a being the hash-keys in hash collect a))
 
 (defun hash-values (hash)
-  "Returns a list of all the values in the given hash table."
+  "Returns a list of all the values in HASH, which is a hash table."
   (loop for a being the hash-values in hash collect a))
 
 (defun interruptible-sleep (secs name)
-  "Sets up a named timer and sleeps for secs seconds or until another thread calls the interrupt-sleep function with the given name.  This function checks once per second to see if the timer has been reached or interrupted."
+  "Sets up a named timer and sleeps for SECS seconds or until another thread calls the interrupt-sleep function with NAME.  This function checks once per second to see if the timer has been reached or interrupted."
   (let ((target (+ (get-universal-time) secs)))
     (setf (gethash name *interruptible-sleep-hash*) nil)
     (loop while (and (< (get-universal-time) target)
@@ -358,11 +360,11 @@ this function returns a list of named parameters that excludes the names (and th
     (remhash name *interruptible-sleep-hash*)))
 
 (defun interrupt-sleep (name)
-  "Interrupts an active time set with another thread using the interruptible-sleep function.  The name parameter specifies the name of the timer to interrupt."
+  "Interrupts an active timer set with another thread using the interruptible-sleep function.  The NAME parameter specifies the name of the timer to interrupt."
   (setf (gethash name *interruptible-sleep-hash*) t))
 
 (defun ds (list-or-atom &optional type)
-  "Create a dc-utilities nested data structure.  Each node in the data structure can be a scalar value or object, a map (hash table), an array, or a list.  Here's an example:
+  "Create a dc-utilities nested data structure.  Each node in LIST-OR-ATOM can be a scalar value or object, a map (hash table), an array, or a list.  Here's an example:
 
     (ds '(:array (:map :name \"Donnie\" :age 50 :height \"6'4\" :weight 225)
                  (:map :name \"Tracy\" :age 45 :height \"5'0'\" :weight 120)))
@@ -386,7 +388,7 @@ When you create a dc-utilities data structure like the one above, you can use ot
             (t (error (format nil "Unknown collection type ~a" type))))))))
 
 (defun ds-get (ds &rest keys)
-  "Get a node (a leaf or a subtree) of ds, a dc-utilities data structure.  The parameters that follow ds describe the path to the node.  For example, given the following data structure in bogus-ds:
+  "Get a node (a leaf or a subtree) of DS, a dc-utilities data structure.  The parameters that follow ds, collected in KEYS, describe the path to the node.  For example, given the following data structure in bogus-ds:
 
     (ds '(:array (:map :name \"Donnie\" :age 50 :height \"6'4\" :weight 225)
                  (:map :name \"Tracy\" :age 45 :height \"5'0'\" :weight 120)))
@@ -423,7 +425,7 @@ or like this:
       (values ds t)))
 
 (defun read-settings-file (&rest filepaths)
-  "Accepts one or more parameters that are the names of settings files.  Reads the settings files in the order provided, with settings in later files overriding settings in earlier files.  A settings file is a Lisp file with a dc-utilities data structure (see the function ds).  This function returns a settings data structure.  Normally, you wouldn't use this function.  Instead, use the load-settings function at the beginning of your program (or when it needs to reload settings) and then use the setting function to retrieve values."
+  "Accepts one or more parameters, collected in FILEPATHS, that are the names of settings files.  Reads the settings files in the order provided, with settings in later files overriding settings in earlier files.  A settings file is a Lisp file with a dc-utilities data structure (see the function ds).  This function returns a settings data structure.  Normally, you wouldn't use this function.  Instead, use the load-settings function at the beginning of your program (or when it needs to reload settings) and then use the setting function to retrieve values."
     (loop
        with settings-ds = (loop for filepath in filepaths
                              collect (ds (slurp-n-thaw filepath)))
@@ -433,16 +435,16 @@ or like this:
        finally (return settings)))
 
 (defun load-settings (&rest filepaths)
-  "Accepts one or more file paths and reads settings from the given files, with settings in later files overriding the same settings in earlier files.  Each settings file is a Lisp file with a dc-utilities data structure."
+  "Accepts one or more file paths, collected in FILEPATHS, and reads settings from the given files, with settings in later files overriding the same settings in earlier files.  Each settings file is a Lisp file with a dc-utilities data structure."
   (setf *settings*
         (apply #'read-settings-file filepaths)))
 
 (defun setting (&rest keys)
-  "Accepts one or more parameters which are used to traverse the settings data structure to locate the desired value."
+  "Accepts one or more parameters, collected in KEYS, which are used to traverse the settings data structure to locate the desired value."
   (apply #'ds-get (cons *settings* keys)))
 
 (defun ds-keys (ds &optional parent-keys)
-  "Given a dc-utilities data structure, this function returns the path to every leaf.  If you provide a key or list of keys in parent-keys, those keys are prepended to the path to every leaf."
+  "Given a dc-utilities data structure DS, this function returns the path to every leaf.  If you provide a key or list of keys in PARENT-KEYS, those keys are prepended to the path to every leaf."
   (when (and parent-keys (atom parent-keys))
     (setf parent-keys (list parent-keys)))
   (case (ds-type ds)
@@ -460,7 +462,7 @@ or like this:
     (t (list parent-keys))))
 
 (defun ds-type (ds)
-  "Given a dc-utilities data structure, this function returns the type of the data structure.  Valid return values include string, sequence, hash-table, and some Common Lisp types." 
+  "Given a dc-utilities data structure DS, this function returns the type of the data structure.  Valid return values include 'string, 'sequence, 'hash-table, and some Common Lisp types." 
   (let* ((a (type-of ds))
          (b (string-downcase (format nil "~a" a))))
     (cond ((ppcre:scan
@@ -474,7 +476,7 @@ or like this:
           (t (car a)))))
 
 (defun ds-set (ds location-key-path value)
-  "In the given dc-utilities data structure, this function sets the value of the node at location-key-path, which is a key or a list of keys, to value."
+  "In the given dc-utilities data structure DS, this function sets the value of the node at LOCATION-KEY-PATH, which is a key or a list of keys, to VALUE."
   (let* ((keys (if (atom location-key-path)
                    (list location-key-path)
                    location-key-path))
@@ -498,7 +500,7 @@ or like this:
                 (ds-set target-ds (cdr keys) value)))))))
 
 (defun ds-merge (ds-base &rest ds-set)
-  "Merges dc-utilities data structures, starting with base and then progressing through the rest of the data structures in order.  Values in later data structures override values in earlier data structures when the paths of the values coincide."
+  "Merges dc-utilities data structures, starting with DS-BASE and then progressing through the rest of the data structures, collected in ds-set, in order.  Values in later data structures override values in earlier data structures when the paths of the values coincide."
   (loop with ds-main = (ds-clone ds-base)
      for ds in ds-set
      do (loop for key-path in (ds-keys ds)
@@ -506,7 +508,7 @@ or like this:
      finally (return ds-main)))
 
 (defun ds-clone (ds)
-  "Clone a dc-utilities data structure."
+  "Clone the dc-utilities data structure DS."
   (case (ds-type ds)
     (hash-table
      (loop with ds-new = (make-hash-table :test 'equal)
@@ -531,7 +533,7 @@ or like this:
     (t ds)))
 
 (defun ds-list (ds)
-  "Render a dc-utilities data structure in a human-readable way"
+  "Render the dc-utilities data structure DS in a human-readable way"
   (case (ds-type ds)
     (hash-table
      (loop with list = (list :map)
@@ -564,7 +566,7 @@ or like this:
             (ds (cons :array data))))))
 
 (defun ds-to-json (ds)
-  "Converts a dc-utilities data structure into JSON."
+  "Converts the dc-utilities data structure DS into JSON."
   (case (ds-type ds)
     (hash-table
      (format nil "{~{~a~^,~}}"
@@ -591,13 +593,13 @@ or like this:
                  (t "~s")) v)))))
 
 (defun hash-string (string)
-  "Hash a string and return a hex representation of the hash"
+  "Hash STRING and return a hex representation of the hash"
   (ironclad:byte-array-to-hex-string
    (ironclad:digest-sequence
     'ironclad:sha512 (string-to-utf-8-bytes string))))
 
 (defun index-values (l)
-  "Accepts a list of values and puts the values in a hash table, keying each value with the index of the value in the list."
+  "Accepts a list of values L and puts the values in a hash table, keying each value with the index of the value in the list."
   (loop with hash = (make-hash-table :test 'equal)
      for value in l
      for key = 0 then (1+ key)
@@ -605,7 +607,7 @@ or like this:
      finally (return hash)))
 
 (defun distinct-elements (list)
-  "Accepts a list of elements and returns a new list with distinct elements from the first list.  (Copies the original list, removes duplicate elements from the copy, and returns the copy.)"
+  "Accepts a list of elements LIST and returns a new list with distinct elements from the first list.  (Copies the original list, removes duplicate elements from the copy, and returns the copy.)"
   (loop with h = (make-hash-table :test 'equal)
      for v = 0 then (1+ v)
      for k in list do (unless (gethash k h)
@@ -619,13 +621,13 @@ or like this:
                                     (< (gethash a h) (gethash b h)))))))))
 
 (defun range (start end &key (step 1) (filter #'identity) shuffle)
-  "Returns a list of values between start and end (inclusive), skipping values by step, filtering remaining values with the function in filter, and shuffling the remaining values if shuffle is true.  Step defaults to 1, filter defaults to allowing all values through, and shuffle default to nil."
+  "Returns a list of values between START and END (inclusive), skipping values by STEP, filtering remaining values with the function in FILTER, and shuffling the remaining values if SHUFFLE is true.  STEP defaults to 1, FILTER defaults to allowing all values through, and SHUFFLE default to nil."
   (let ((range (loop for a from start to end by step
                   when (funcall filter a) collect a)))
     (if shuffle (shuffle range) range)))
 
 (defun change-per-second (function-or-symbol &optional (seconds 1))
-  "Given a function who's return value changes over time, or a variable who's value changes over time, with the change being unidirectional, this function computes the rate of change by calling the function, sleeping, then calling the function again, then computing the rate of change per second.  You can optionally specify the number of seconds to wait between calls.  If function-or-symbol is a variable, then this function retrieves the value of the variable, sleeps, then retrieves the value of the variable again." 
+  "Given the function FUNCTION-OR-SYMBOL, who's return value changes over time, or a variable who's value changes over time, with the change being unidirectional, this function computes the rate of change by calling the function, sleeping, then calling the function again, then computing the rate of change per second.  You can optionally specify the number of seconds to wait between calls.  If FUNCTION-OR-SYMBOL is a variable, then this function retrieves the value of the variable, sleeps, then retrieves the value of the variable again." 
   (let ((v1 (if (functionp function-or-symbol)
                 (funcall function-or-symbol)
                 (symbol-value function-or-symbol)))
@@ -636,7 +638,7 @@ or like this:
     (/ (abs (- v1 v2)) (float seconds))))
 
 (defun time-to-go (change-per-second record-count)
-  "Given the number of records per second that are being processed (given in change-per-second) and the nuber of records remaining (given in record-count), this function computes the amount of time still left before all the records have been processed."
+  "Given the number of records per second that are being processed (given in CHANGE-PER-SECOND) and the nuber of records remaining (given in RECORD-COUNT), this function computes the amount of time still left before all the records have been processed."
   (let* ((seconds (/ record-count (float change-per-second)))
          (hours (/ seconds 3600.0))
          (days (/ hours 24.0)))
@@ -644,36 +646,36 @@ or like this:
           :seconds seconds :hours hours :days days)))
 
 (defun thread-pool-time-to-go (pool-name total-record-count)
-  "Returns the amount of time left for the given pool to complete processing all the records."
+  "Returns the amount of time left for the thread pool given by POOL-NAME to complete processing all the records, the total number of which is given in TOTAL-RECORD-COUNT."
   (time-to-go
    (change-per-second (lambda () (thread-pool-progress pool-name)) 10)
    (- total-record-count (thread-pool-progress pool-name))))
 
 (defun thread-pool-start-time (pool-name)
-  "Retrieves the start-time for the given thread-pool."
+  "Retrieves the start-time for thread-pool named in POOL-NAME."
   (getf *dc-thread-pool-start-time* pool-name))
 
 (defun thread-pool-stop-time (pool-name)
-  "Retrieves the stop-time for the given thread-pool."
+  "Retrieves the stop-time for the thread-pool named in POOL-NAME."
   (getf *dc-thread-pool-stop-time* pool-name))
 
 (defun thread-pool-run-time (pool-name)
-  "Computes the number of seconds that the given thread-pool has been running."
+  "Computes the number of seconds that the thread-pool named in POOL-NAME has been running."
   (let ((start (thread-pool-start-time pool-name))
         (stop (thread-pool-stop-time pool-name)))
     (if start (- (if stop stop (get-universal-time)) start) 0)))
 
 (defun thread-pool-progress (pool-name)
-  "Retrieves the count of the records that the given thread pool has already processed."
+  "Retrieves the count of the records that the thread pool given by POOL-NAME has already processed."
   (getf *dc-thread-pool-progress* pool-name))
 
 (defun job-queue (pool-name)
-  "Retrieve the job-queue for the given thread pool."
+  "Retrieve the job-queue for the thread pool given by POOL-NAME."
   (getf *dc-job-queue* pool-name))
 
 (defun thread-pool-start
     (pool-name thread-count job-queue fn-job &optional fn-finally)
-  "Starts thread-count threads using pool-name to name the threads and runs fn-job with those threads.  Each thread runs fn-job, which takes no parameters, in a loop.  When all the threads are done, this function checks fn-finally.  If the caller provides fn-finally, then this function returns with the result of calling fn-finally.  If the caller doesn't provide fn-finally, then the this function exists with a sum of the return values of all the threads that ran."
+  "Starts THREAD-COUNT threads using POOL-NAME to name the threads and runs FN-JOB with those threads.  Each thread runs FN-JOB, which takes no parameters, in a loop.  When all the threads are done, this function checks FN-FINALLY.  If the caller provides FN-FINALLY, then this function returns with the result of calling FN-FINALLY.  If the caller doesn't provide FN-FINALLY, then the this function exits with a sum of the return values of all the threads that ran."
   (setf (getf *dc-thread-pool-progress* pool-name) 0)
   (setf (getf *dc-progress-mutex* pool-name)
         (make-mutex :name (symbol-name pool-name)))
@@ -718,7 +720,7 @@ or like this:
    :name (format nil "~a-000" pool-name)))
 
 (defun thread-pool-stop (pool-name)
-  "Stops all the threads in the named thread-pool."
+  "Stops all the threads in the thread-pool POOL-NAME."
   (loop for threads = (remove-if-not
                        (lambda (x)
                          (scan (format nil "^~a" pool-name)
@@ -736,11 +738,13 @@ or like this:
 ;;
 
 (defun factorial (n)
+  "Computes the factorial for N."
   (loop for a from n downto 1
         for b = a then (* b a)
         finally (return b)))
 
 (defun k-combination (k n)
+  "Computes the k-combination value for K and N."
   (/ (factorial n)
      (* (factorial k) (factorial (- n k)))))
 
@@ -749,26 +753,26 @@ or like this:
 ;;
 
 (defun file-exists (path)
-  "Returns a boolean value indicating if the file specified by path exists."
+  "Returns a boolean value indicating if the file specified by PATH exists."
   (let ((path (probe-file path)))
     (and path
          (not (equal (file-namestring path) "")))))
 
 (defun directory-exists (path)
-  "Returns a boolean value indicating if the file specified by path exists."
+  "Returns a boolean value indicating if the directory specified by PATH exists."
   (let ((path (probe-file path)))
     (and path
          (not (equal (directory-namestring path) ""))
          (equal (file-namestring path) ""))))
 
 (defun file-extension (path)
-  "Returns a string consisting of the file extension for the given file name."
+  "Returns a string consisting of the file extension for the file name given in PATH."
   (multiple-value-bind (a b)
       (ppcre:scan-to-strings "\\.([a-z0-9]+)$" path)
     (when a (aref b 0))))
 
 (defun store-path (root filename)
-  "Computes a path from a root folder and a filename.  This is useful for when you plan to write many more files than can be held in a single directory.  This function will help you create a tree of directories for the files that you want to store.  The filename must have at least 15 characters, and the last 15 characters of the filename must be alphanumeric characters."
+  "Computes a path from ROOT (a root folder) and FILENAME, a regular file.  This is useful for when you plan to write many more files than can be held in a single directory.  This function will help you create a tree of directories for the files that you want to store.  FILENAME must have at least 15 characters, and the last 15 characters of FILENAME must be alphanumeric characters."
   (when (string= root "/") (setf root ""))
   (loop for a from 0 below 5
      for b = (* a 3)
@@ -781,7 +785,7 @@ or like this:
                  (reverse folders))))))
 
 (defun store-save (root key object)
-  "Freezes (serializes into a string) the given object, then stores the string in the file specified by root and key.  This function calls the store-path function to create the path where the object is going to be stored.  Therefore, key must have at least 15 characters and the last 15 characters of key must be alphanumeric characters."
+  "Freezes (serializes into a string) the object in OBJECT, then stores the string in the file specified by ROOT and KEY.  This function calls the store-path function to create the path where the object is going to be stored.  Therefore, KEY must have at least 15 characters and the last 15 characters of KEY must be alphanumeric characters."
   (let* ((contents (freeze object))
          (path (store-path root key))
          (abs-filename (join-paths path key)))
@@ -789,14 +793,14 @@ or like this:
     key))
 
 (defun store-fetch (root key)
-  "Reads the content of the file specified by root and key, and deserializes that content into an object.  See the store-save and and store-path functions for information about how root and key are treated."
+  "Reads the content of the file specified by ROOT and KEY, and deserializes that content into an object.  See the store-save and and store-path functions for information about how ROOT and KEY are treated."
   (let* ((path (store-path root key))
          (abs-filename (join-paths path key)))
     (when (file-exists abs-filename)
       (slurp-n-thaw abs-filename))))
 
 (defun store-delete (root key)
-  "Deletes the file specified by root and key.  See the store-save and store-path functions for information about how root and key are treated."
+  "Deletes the file specified by ROOT and KEY.  See the store-save and store-path functions for information about how ROOT and KEY are treated."
   (let* ((path (store-path root key))
          (abs-filename (join-paths path key))
          (article (store-fetch root key)))
@@ -805,20 +809,20 @@ or like this:
       article)))
 
 (defun uint-to-bytes (i &optional (size 4))
-  "Converts the unsigned integer in i into a list of bytes.  The size parameter specifies the byte-size of the integer in i."
+  "Converts the unsigned integer I into a list of bytes.  The SIZE parameter specifies the byte-size of the integer in I."
   (loop with ff = 255
      for a = i then (ash a -8)
      for b from 1 to size
      collect (logand a ff)))
 
 (defun bytes-to-uint (byte-list)
-  "Converts a list of bytes into an unsigned integer."
+  "Converts the list of bytes BYTE-LIST into an unsigned integer."
   (loop for a in byte-list
      for b from 0 below (length byte-list)
      summing (* a (expt 2 (* b 8)))))
 
 (defun sequence-uint-to-bytes (sequence &optional (size 4))
-  "Converts a sequence of unsigned integers into a list of bytes.  The size parameter specifies the byte-size of the integers in the list."
+  "Converts SEQUENCE, as sequence of unsigned integers into a list of bytes.  The SIZE parameter specifies the byte-size of the integers in SEQUENCE."
   (if (vectorp sequence)
       (loop with result = (make-array (* size (length sequence)))
          for a across sequence
@@ -832,7 +836,7 @@ or like this:
            appending (uint-to-bytes a size))))
 
 (defun sequence-bytes-to-uint (sequence &optional (size 4))
-  "Converts a sequence of bytes into a sequence of unsigned integers of byte-size size."
+  "Converts SEQUENCE, a sequence of bytes, into a sequence of unsigned integers of byte-size SIZE."
   (if (vectorp sequence)
       (loop with result = (make-array (/ (length sequence) size))
          for source-index from 0 below (length sequence) by size
@@ -846,7 +850,7 @@ or like this:
            collecting (bytes-to-uint (subseq sequence index (+ index size))))))
 
 (defun fast-compress (v)
-  "Uses a simple compression mechanism to very quickly compress a vector into a list."
+  "Uses a simple compression mechanism to very quickly compress the vector in V into a list."
   (loop with c = nil
      with l = (length v)
      for i from 0 below l
@@ -865,7 +869,7 @@ or like this:
      finally (return (nreverse c))))
 
 (defun fast-decompress (l)
-  "Quickly decompresses a list or vector created by fast-compress into the original vector."
+  "Quickly decompresses the list or vector L, created by fast-compress, into the original vector."
   (map 'vector 'identity
        (if (listp l)
            (loop for n in l appending
@@ -874,23 +878,24 @@ or like this:
                 (if (< n 0) (loop for a from 1 to (- n) collect 0) (list n))))))
 
 (defun parse-number (string)
-  "Converts a string that contains a number into the number."
+  "Converts STRING, which contains a number, into the number."
   (with-input-from-string (s string) (read s)))
 
 (defun home-based (path)
-  "Prepends the user's home directory to the given path."
+  "Prepends the user's home directory to PATH."
   (format nil "~a/~a" (namestring (user-homedir-pathname)) path))
 
 (defun mark-time (tag)
-  "Marks the current time and stores it with the given tag.  You can later read this time by passing the tag to the read-time function."
+  "Marks the current time and stores it with the name given in TAG.  You can later read this time by passing TAG to the read-time function."
   (setf (gethash tag *dc-timings*) (get-internal-real-time)))
 
 (defun read-time (tag)
-  "Reads the time that was marked with the given tag. See the mark-time function."
+  "Reads the time that was marked with the name given in TAG. See the mark-time function."
   (/ (- (get-internal-real-time) (gethash tag *dc-timings*))
      (float internal-time-units-per-second)))
 
 (defun document-package (package output-filename)
+  "Documents the Common Lisp package PACKAGE and writes that documentation to the file given by OUTPUT-FILENAME."
   (loop for function being the external-symbols of (find-package package)
      when (and (fboundp function) (documentation (symbol-function function) t))
      collect
@@ -904,13 +909,12 @@ or like this:
                           :key (lambda (x) (getf x :function-name)))
                   collect (format nil "## ~a ~a~%~a"
                                   (string-downcase (getf function :function-name))
-                                  (string-downcase
-                                   (replace-regexs
-                                    (format nil "~s"
-                                            (sb-introspect:function-lambda-list
-                                             (symbol-function (getf function :function))))
-                                    '(("\\s\\s+" " ")
-                                      ("DC-UTILITIES::" ""))))
+                                  (replace-regexs
+                                   (format nil "~s"
+                                           (sb-introspect:function-lambda-list
+                                            (symbol-function (getf function :function))))
+                                   '(("\\s\\s+" " ")
+                                     ("DC-UTILITIES::" "")))
                                   (getf function :documentation))
                   into function-docs
                     finally (spew (format nil "~{~a~^~%~%~}" function-docs)
