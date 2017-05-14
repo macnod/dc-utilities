@@ -223,7 +223,7 @@ Reads and brings to life serialized objects from the file FILENAME.
 Writes the contents of STRING to the file specified by FILENAME.  Use the CREATE-DIRECTORIES parameter if any of the directories in the path in FILENAME don't exist and you want to create them.  Use the APPEND parameter if you want to append STRING to an existing file.
 
 ## split-n-trim (STRING &KEY (ON-REGEX "\\s+") (FAT "^\\s+|\\s+$"))
-Splits STRING into substrings on SPLITTER-REGEX, then trims whitespace from the beginning and end of each substring.  The SPLITTER-REGEX parameter value, which is optional, defaults to \s+, which is to say that the string is split into a list of words at the whitespace boundaries.  Here's an example:
+Splits STRING into substrings on SPLITTER-REGEX, then trims FAT from each substring.  The SPLITTER-REGEX parameter value, which is optional, defaults to \s+, which is to say that the string is split into a list of words at the whitespace boundaries.  The default value for FAT, which is also optional, causes this function to trim whitespace from the beggining and end of each substring.  Here's an example:
 
     (split-n-trim "Hello  beautiful      world!")
 
