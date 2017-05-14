@@ -62,6 +62,7 @@
    read-settings-file
    read-time
    replace-regexs
+   replace-extension
    scrape-string
    sequence-bytes-to-uint
    sequence-uint-to-bytes
@@ -94,6 +95,8 @@
    to-ascii
    trim
    uint-to-bytes
+   unique-name
+   unique-filename
    unshift
    verify-string
    with-lines-in-file

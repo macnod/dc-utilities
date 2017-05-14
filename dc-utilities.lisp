@@ -247,14 +247,15 @@
            (get-universal-time)
            (random 1000000000))))
 
-(defun split-n-trim (string &optional (splitter-regex "\\s+"))
+(defun split-n-trim (string &key (on-regex "\\s+") (fat "^\\s+|\\s+$"))
   "Splits STRING into substrings on SPLITTER-REGEX, then trims whitespace from the beginning and end of each substring.  The SPLITTER-REGEX parameter value, which is optional, defaults to \\s+, which is to say that the string is split into a list of words at the whitespace boundaries.  Here's an example:
 
     (split-n-trim \"Hello  beautiful      world!\")
 
     => '(\"Hello\" \"beautiful\" \"world!\")"
   (remove-if (lambda (s) (zerop (length s)))
-             (mapcar #'trim (split splitter-regex string))))
+             (mapcar (lambda (x) (trim x fat))
+                     (split on-regex string))))
 
 (defun trim (s &optional (fat "^\\s+|\\s+$"))
   "Trim FAT from the string in S.  The FAT parameter is optional and defaults to \"^\\s+|\\s+$\", which means \"Whitespace at the beginning or end of the string\"."
@@ -770,6 +771,19 @@ or like this:
   (multiple-value-bind (a b)
       (ppcre:scan-to-strings "\\.([a-z0-9]+)$" path)
     (when a (aref b 0))))
+
+(defun replace-extension (filename new-extension)
+  "This function replaces the file extension in FILENAME with the file extension provided in NEW-EXTENSION."
+  (let* ((new-extension (if (scan "^\\." new-extension)
+                            (subseq new-extension 1)
+                            new-extension))
+         (new-filename (multiple-value-bind (a b)
+                           (scan-to-strings "^(.*)\\.[^.]+$" filename)
+                         (declare (ignore a))
+                         (if b (elt b 0) filename))))
+    (when (and new-filename (not (zerop (length new-extension))))
+      (setf new-filename (format nil "~a.~a" new-filename new-extension)))
+    new-filename))
 
 (defun store-path (root filename)
   "Computes a path from ROOT (a root folder) and FILENAME, a regular file.  This is useful for when you plan to write many more files than can be held in a single directory.  This function will help you create a tree of directories for the files that you want to store.  FILENAME must have at least 15 characters, and the last 15 characters of FILENAME must be alphanumeric characters."

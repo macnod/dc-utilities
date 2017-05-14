@@ -41,13 +41,13 @@ Create a dc-utilities nested data structure.  Each node in LIST-OR-ATOM can be a
 
 When you create a dc-utilities data structure like the one above, you can use other data-structure functions to easily access and manipulate the data.
 
-## ds-clone (DS)
+## ds-clone (DC-UTILITIES:DS)
 Clone the dc-utilities data structure DS.
 
 ## ds-from-json (JSON)
 Creates a dc-utilities data structure from JSON.  This is useful if you want to easily traverse the JSON data structure.
 
-## ds-get (DS &REST KEYS)
+## ds-get (DC-UTILITIES:DS &REST KEYS)
 Get a node (a leaf or a subtree) of DS, a dc-utilities data structure.  The parameters that follow ds, collected in KEYS, describe the path to the node.  For example, given the following data structure in bogus-ds:
 
     (ds '(:array (:map :name "Donnie" :age 50 :height "6'4" :weight 225)
@@ -64,22 +64,22 @@ or like this:
                  0)
             :weight)
 
-## ds-keys (DS &OPTIONAL PARENT-KEYS)
+## ds-keys (DC-UTILITIES:DS &OPTIONAL PARENT-KEYS)
 Given a dc-utilities data structure DS, this function returns the path to every leaf.  If you provide a key or list of keys in PARENT-KEYS, those keys are prepended to the path to every leaf.
 
-## ds-list (DS)
+## ds-list (DC-UTILITIES:DS)
 Render the dc-utilities data structure DS in a human-readable way
 
-## ds-merge (DS-BASE &REST DS-SET)
+## ds-merge (DS-BASE &REST DC-UTILITIES:DS-SET)
 Merges dc-utilities data structures, starting with DS-BASE and then progressing through the rest of the data structures, collected in ds-set, in order.  Values in later data structures override values in earlier data structures when the paths of the values coincide.
 
-## ds-set (DS LOCATION-KEY-PATH VALUE)
+## ds-set (DC-UTILITIES:DS LOCATION-KEY-PATH VALUE)
 In the given dc-utilities data structure DS, this function sets the value of the node at LOCATION-KEY-PATH, which is a key or a list of keys, to VALUE.
 
-## ds-to-json (DS)
+## ds-to-json (DC-UTILITIES:DS)
 Converts the dc-utilities data structure DS into JSON.
 
-## ds-type (DS)
+## ds-type (DC-UTILITIES:DS)
 Given a dc-utilities data structure DS, this function returns the type of the data structure.  Valid return values include 'string, 'sequence, 'hash-table, and some Common Lisp types.
 
 ## factorial (N)
@@ -163,7 +163,7 @@ Converts STRING, which contains a number, into the number.
 ## path-only (FILENAME)
 Retrieves the path (path only, without the filename) of FILENAME.
 
-## range (START END &KEY (STEP 1) (FILTER #'IDENTITY) SHUFFLE)
+## range (START END &KEY (STEP 1) (FILTER #'IDENTITY) DC-UTILITIES:SHUFFLE)
 Returns a list of values between START and END (inclusive), skipping values by STEP, filtering remaining values with the function in FILTER, and shuffling the remaining values if SHUFFLE is true.  STEP defaults to 1, FILTER defaults to allowing all values through, and SHUFFLE default to nil.
 
 ## read-one-line (STREAM &KEY (EOL :UNIX) (MAX-LENGTH 500))
@@ -174,6 +174,9 @@ Accepts one or more parameters, collected in FILEPATHS, that are the names of se
 
 ## read-time (TAG)
 Reads the time that was marked with the name given in TAG. See the mark-time function.
+
+## replace-extension (FILENAME NEW-EXTENSION)
+This function replaces the file extension in FILENAME with the file extension provided in NEW-EXTENSION.
 
 ## replace-regexs (TEXT LIST-OF-REGEX-REPLACEMENT-PAIRS &KEY IGNORE-CASE)
 Searches through TEXT for substrings that match the regexs in LIST-OF-REGEX-REPLACEMENTS and replaces those substrings with the corresponding replacements in LIST-OF-REGEX-REPLACEMENTS.  Use the IGNORE-CASE parameter if you want case-insensitive matches.  Here's an example:
@@ -219,7 +222,7 @@ Reads and brings to life serialized objects from the file FILENAME.
 ## spew (STRING FILENAME &KEY CREATE-DIRECTORIES APPEND)
 Writes the contents of STRING to the file specified by FILENAME.  Use the CREATE-DIRECTORIES parameter if any of the directories in the path in FILENAME don't exist and you want to create them.  Use the APPEND parameter if you want to append STRING to an existing file.
 
-## split-n-trim (STRING &OPTIONAL (SPLITTER-REGEX "\\s+"))
+## split-n-trim (STRING &KEY (ON-REGEX "\\s+") (FAT "^\\s+|\\s+$"))
 Splits STRING into substrings on SPLITTER-REGEX, then trims whitespace from the beginning and end of each substring.  The SPLITTER-REGEX parameter value, which is optional, defaults to \s+, which is to say that the string is split into a list of words at the whitespace boundaries.  Here's an example:
 
     (split-n-trim "Hello  beautiful      world!")
@@ -262,7 +265,7 @@ Retrieves the stop-time for the thread-pool named in POOL-NAME.
 ## thread-pool-time-to-go (POOL-NAME TOTAL-RECORD-COUNT)
 Returns the amount of time left for the thread pool given by POOL-NAME to complete processing all the records, the total number of which is given in TOTAL-RECORD-COUNT.
 
-## time-to-go (CHANGE-PER-SECOND RECORD-COUNT)
+## time-to-go (DC-UTILITIES:CHANGE-PER-SECOND RECORD-COUNT)
 Given the number of records per second that are being processed (given in CHANGE-PER-SECOND) and the nuber of records remaining (given in RECORD-COUNT), this function computes the amount of time still left before all the records have been processed.
 
 ## timestamp (&KEY (TIME (GET-UNIVERSAL-TIME)) STRING (FORMAT "Y-M-DTh:m:s"))
@@ -276,6 +279,9 @@ Trim FAT from the string in S.  The FAT parameter is optional and defaults to "^
 
 ## uint-to-bytes (I &OPTIONAL (SIZE 4))
 Converts the unsigned integer I into a list of bytes.  The SIZE parameter specifies the byte-size of the integer in I.
+
+## unique-name NIL
+Returns a fairly unique short string
 
 ## verify-string (STRING REGEX &KEY IGNORE-CASE)
 Return t if STRING matches the REGEX exactly.  Use the IGNORE-CASE parameter if you want case-insensitve matches.
