@@ -82,6 +82,9 @@ Converts the dc-utilities data structure DS into JSON.
 ## ds-type (DS)
 Given a dc-utilities data structure DS, this function returns the type of the data structure.  Valid return values include 'string, 'sequence, 'hash-table, and some Common Lisp types.
 
+## elapsed-time (TAG)
+Computes time elapsed since calling mark-time with TAG.
+
 ## factorial (N)
 Computes the factorial for N.
 
@@ -155,7 +158,7 @@ Returns the length of the file FILENAME.
 Accepts one or more strings, concatenates them, precedes the result with a timestamp, and returns a string that looks like a log entry.
 
 ## mark-time (TAG)
-Marks the current time and stores it with the name given in TAG.  You can later read this time by passing TAG to the read-time function.
+Marks the current time with TAG, for the purpose of later retrieving elapsed time.  See the elapsed-time function.
 
 ## memoize (FUNCTION-SYMBOL)
 Incorporate caching into a function, specified by the symbol FUNCTION-SYMBOL, so that when the function is called with the same parameter a second time, it can retrieve the result from the cache instead of having to compute the result again.
@@ -177,9 +180,6 @@ Reads a single line from STREAM and returns the line as a string.  You can speci
 
 ## read-settings-file (&REST FILEPATHS)
 Accepts one or more parameters, collected in FILEPATHS, that are the names of settings files.  Reads the settings files in the order provided, with settings in later files overriding settings in earlier files.  A settings file is a Lisp file with a dc-utilities data structure (see the function ds).  This function returns a settings data structure.  Normally, you wouldn't use this function.  Instead, use the load-settings function at the beginning of your program (or when it needs to reload settings) and then use the setting function to retrieve values.
-
-## read-time (TAG)
-Reads the time that was marked with the name given in TAG. See the mark-time function.
 
 ## replace-extension (FILENAME NEW-EXTENSION)
 This function replaces the file extension in FILENAME with the file extension provided in NEW-EXTENSION.

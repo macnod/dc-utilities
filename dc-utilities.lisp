@@ -908,11 +908,11 @@ or like this:
   (join-paths (namestring (user-homedir-pathname)) path))
 
 (defun mark-time (tag)
-  "Marks the current time and stores it with the name given in TAG.  You can later read this time by passing TAG to the read-time function."
+  "Marks the current time with TAG, for the purpose of later retrieving elapsed time.  See the elapsed-time function."
   (setf (gethash tag *dc-timings*) (get-internal-real-time)))
 
-(defun read-time (tag)
-  "Reads the time that was marked with the name given in TAG. See the mark-time function."
+(defun elapsed-time (tag)
+  "Computes time elapsed since calling mark-time with TAG."
   (/ (- (get-internal-real-time) (gethash tag *dc-timings*))
      (float internal-time-units-per-second)))
 

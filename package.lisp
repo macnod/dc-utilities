@@ -28,6 +28,7 @@
    ds-to-json
    ds-type
    document-package
+   elapsed-time
    factorial
    fast-compress
    fast-decompress
@@ -62,7 +63,6 @@
    range
    read-one-line
    read-settings-file
-   read-time
    replace-regexs
    replace-extension
    scrape-string
