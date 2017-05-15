@@ -343,6 +343,14 @@ this function returns a list of named parameters that excludes the names (and th
                        collect (elt named-params i)))
          appending (list key (getf named-params key)))))
 
+(defun list-keys (plist)
+  "Returns the keys (properties) of the property list PLIST"
+  (loop for (k v) on plist by #'cddr collect k))
+
+(defun list-values (plist)
+  "Returns the values of the property list PLIST"
+  (loop for (k v) on plist by #'cddr collect v))
+
 (defun hash-keys (hash)
   "Returns a list of all the keys in HASH, which is a hash table."
   (loop for a being the hash-keys in hash collect a))
@@ -676,7 +684,7 @@ or like this:
 
 (defun thread-pool-start
     (pool-name thread-count job-queue fn-job &optional fn-finally)
-  "Starts THREAD-COUNT threads using POOL-NAME to name the threads and runs FN-JOB with those threads.  Each thread runs FN-JOB, which takes no parameters, in a loop.  When all the threads are done, this function checks FN-FINALLY.  If the caller provides FN-FINALLY, then this function returns with the result of calling FN-FINALLY.  If the caller doesn't provide FN-FINALLY, then the this function exits with a sum of the return values of all the threads that ran."
+  "Starts THREAD-COUNT threads using POOL-NAME (a keyword symbol) to name the threads and runs FN-JOB with those threads.  Each thread runs FN-JOB, which takes no parameters, in a loop.  When all the threads are done, this function checks FN-FINALLY.  If the caller provides FN-FINALLY, then this function returns with the result of calling FN-FINALLY.  If the caller doesn't provide FN-FINALLY, then the this function exits with a sum of the return values of all the threads that ran."
   (setf (getf *dc-thread-pool-progress* pool-name) 0)
   (setf (getf *dc-progress-mutex* pool-name)
         (make-mutex :name (symbol-name pool-name)))
@@ -897,7 +905,7 @@ or like this:
 
 (defun home-based (path)
   "Prepends the user's home directory to PATH."
-  (format nil "~a/~a" (namestring (user-homedir-pathname)) path))
+  (join-paths (namestring (user-homedir-pathname)) path))
 
 (defun mark-time (tag)
   "Marks the current time and stores it with the name given in TAG.  You can later read this time by passing TAG to the read-time function."

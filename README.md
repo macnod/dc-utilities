@@ -41,13 +41,13 @@ Create a dc-utilities nested data structure.  Each node in LIST-OR-ATOM can be a
 
 When you create a dc-utilities data structure like the one above, you can use other data-structure functions to easily access and manipulate the data.
 
-## ds-clone (DC-UTILITIES:DS)
+## ds-clone (DS)
 Clone the dc-utilities data structure DS.
 
 ## ds-from-json (JSON)
 Creates a dc-utilities data structure from JSON.  This is useful if you want to easily traverse the JSON data structure.
 
-## ds-get (DC-UTILITIES:DS &REST KEYS)
+## ds-get (DS &REST KEYS)
 Get a node (a leaf or a subtree) of DS, a dc-utilities data structure.  The parameters that follow ds, collected in KEYS, describe the path to the node.  For example, given the following data structure in bogus-ds:
 
     (ds '(:array (:map :name "Donnie" :age 50 :height "6'4" :weight 225)
@@ -64,22 +64,22 @@ or like this:
                  0)
             :weight)
 
-## ds-keys (DC-UTILITIES:DS &OPTIONAL PARENT-KEYS)
+## ds-keys (DS &OPTIONAL PARENT-KEYS)
 Given a dc-utilities data structure DS, this function returns the path to every leaf.  If you provide a key or list of keys in PARENT-KEYS, those keys are prepended to the path to every leaf.
 
-## ds-list (DC-UTILITIES:DS)
+## ds-list (DS)
 Render the dc-utilities data structure DS in a human-readable way
 
-## ds-merge (DS-BASE &REST DC-UTILITIES:DS-SET)
+## ds-merge (DS-BASE &REST DS-SET)
 Merges dc-utilities data structures, starting with DS-BASE and then progressing through the rest of the data structures, collected in ds-set, in order.  Values in later data structures override values in earlier data structures when the paths of the values coincide.
 
-## ds-set (DC-UTILITIES:DS LOCATION-KEY-PATH VALUE)
+## ds-set (DS LOCATION-KEY-PATH VALUE)
 In the given dc-utilities data structure DS, this function sets the value of the node at LOCATION-KEY-PATH, which is a key or a list of keys, to VALUE.
 
-## ds-to-json (DC-UTILITIES:DS)
+## ds-to-json (DS)
 Converts the dc-utilities data structure DS into JSON.
 
-## ds-type (DC-UTILITIES:DS)
+## ds-type (DS)
 Given a dc-utilities data structure DS, this function returns the type of the data structure.  Valid return values include 'string, 'sequence, 'hash-table, and some Common Lisp types.
 
 ## factorial (N)
@@ -139,6 +139,12 @@ Joins elements of PATH-PARTS into a file path, inserting slashes where necessary
 ## k-combination (K N)
 Computes the k-combination value for K and N.
 
+## list-keys (PLIST)
+Returns the keys (properties) of the property list PLIST
+
+## list-values (PLIST)
+Returns the values of the property list PLIST
+
 ## load-settings (&REST FILEPATHS)
 Accepts one or more file paths, collected in FILEPATHS, and reads settings from the given files, with settings in later files overriding the same settings in earlier files.  Each settings file is a Lisp file with a dc-utilities data structure.
 
@@ -163,7 +169,7 @@ Converts STRING, which contains a number, into the number.
 ## path-only (FILENAME)
 Retrieves the path (path only, without the filename) of FILENAME.
 
-## range (START END &KEY (STEP 1) (FILTER #'IDENTITY) DC-UTILITIES:SHUFFLE)
+## range (START END &KEY (STEP 1) (FILTER #'IDENTITY) SHUFFLE)
 Returns a list of values between START and END (inclusive), skipping values by STEP, filtering remaining values with the function in FILTER, and shuffling the remaining values if SHUFFLE is true.  STEP defaults to 1, FILTER defaults to allowing all values through, and SHUFFLE default to nil.
 
 ## read-one-line (STREAM &KEY (EOL :UNIX) (MAX-LENGTH 500))
@@ -251,7 +257,7 @@ Retrieves the count of the records that the thread pool given by POOL-NAME has a
 Computes the number of seconds that the thread-pool named in POOL-NAME has been running.
 
 ## thread-pool-start (POOL-NAME THREAD-COUNT JOB-QUEUE FN-JOB &OPTIONAL FN-FINALLY)
-Starts THREAD-COUNT threads using POOL-NAME to name the threads and runs FN-JOB with those threads.  Each thread runs FN-JOB, which takes no parameters, in a loop.  When all the threads are done, this function checks FN-FINALLY.  If the caller provides FN-FINALLY, then this function returns with the result of calling FN-FINALLY.  If the caller doesn't provide FN-FINALLY, then the this function exits with a sum of the return values of all the threads that ran.
+Starts THREAD-COUNT threads using POOL-NAME (a keyword symbol) to name the threads and runs FN-JOB with those threads.  Each thread runs FN-JOB, which takes no parameters, in a loop.  When all the threads are done, this function checks FN-FINALLY.  If the caller provides FN-FINALLY, then this function returns with the result of calling FN-FINALLY.  If the caller doesn't provide FN-FINALLY, then the this function exits with a sum of the return values of all the threads that ran.
 
 ## thread-pool-start-time (POOL-NAME)
 Retrieves the start-time for thread-pool named in POOL-NAME.
@@ -265,7 +271,7 @@ Retrieves the stop-time for the thread-pool named in POOL-NAME.
 ## thread-pool-time-to-go (POOL-NAME TOTAL-RECORD-COUNT)
 Returns the amount of time left for the thread pool given by POOL-NAME to complete processing all the records, the total number of which is given in TOTAL-RECORD-COUNT.
 
-## time-to-go (DC-UTILITIES:CHANGE-PER-SECOND RECORD-COUNT)
+## time-to-go (CHANGE-PER-SECOND RECORD-COUNT)
 Given the number of records per second that are being processed (given in CHANGE-PER-SECOND) and the nuber of records remaining (given in RECORD-COUNT), this function computes the amount of time still left before all the records have been processed.
 
 ## timestamp (&KEY (TIME (GET-UNIVERSAL-TIME)) STRING (FORMAT "Y-M-DTh:m:s"))

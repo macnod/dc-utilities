@@ -49,6 +49,8 @@
    interruptible-sleep
    join-paths
    k-combination
+   list-keys
+   list-values
    load-settings
    lof
    log-entry
