@@ -20,7 +20,7 @@
 (defparameter *dc-thread-pool-progress* nil)
 (defparameter *dc-thread-pool-start-time* nil)
 (defparameter *dc-thread-pool-stop-time* nil)
-(defparameter *dc-timings* (make-hash-table :test #'equal))
+(defparameter *dc-timings* (make-hash-table :test #'equal :synchronized t))
 
 (defun to-ascii (s)
   "Converts the string S, which may contain non-ascii characters, into a string with nothing but ascii characters.  Non ascii characters are converted into spaces.  If S is a list, this function converts each element of the list into an all-ascii string."
@@ -683,7 +683,12 @@ or like this:
   (getf *dc-job-queue* pool-name))
 
 (defun thread-pool-start
-    (pool-name thread-count job-queue fn-job &optional fn-finally)
+    (&key (pool-name (error "pool-name parameter is required"))
+       (thread-count (error "thread-count parameter is required"))
+       (job-queue (error "job-queue paramater is required"))
+       (fn-job (error "fn-job parameter is required"))
+       (standard-output *standard-output*)
+       fn-finally)
   "Starts THREAD-COUNT threads using POOL-NAME (a keyword symbol) to name the threads and runs FN-JOB with those threads.  Each thread runs FN-JOB, which takes no parameters, in a loop.  When all the threads are done, this function checks FN-FINALLY.  If the caller provides FN-FINALLY, then this function returns with the result of calling FN-FINALLY.  If the caller doesn't provide FN-FINALLY, then the this function exits with a sum of the return values of all the threads that ran."
   (setf (getf *dc-thread-pool-progress* pool-name) 0)
   (setf (getf *dc-progress-mutex* pool-name)
@@ -712,7 +717,7 @@ or like this:
                    (lambda ()
                      (loop for job = (funcall get-job)
                         while job
-                        do (funcall fn-job job)
+                        do (funcall fn-job standard-output job)
                           (with-mutex
                               ((getf *dc-progress-mutex* pool-name))
                             (incf (getf *dc-thread-pool-progress* pool-name)))
@@ -724,7 +729,7 @@ or like this:
                     (setf (getf *dc-thread-pool-stop-time* pool-name)
                           (get-universal-time))
                     (return (if fn-finally
-                                (funcall fn-finally)
+                                (funcall fn-finally standard-output)
                                 total))))))
    :name (format nil "~a-000" pool-name)))
 
@@ -907,17 +912,39 @@ or like this:
   "Prepends the user's home directory to PATH."
   (join-paths (namestring (user-homedir-pathname)) path))
 
-(defun mark-time (tag)
-  "Marks the current time with TAG, for the purpose of later retrieving elapsed time.  See the elapsed-time function."
-  (setf (gethash tag *dc-timings*) (get-internal-real-time)))
+(defun make-time-tracker ()
+  "Creates a time-tracker object that you can use later in calls to mark-time and elapsed-time."
+  (ds `(:map :mutex ,(make-mutex :name "time-tracker")
+             :time-tracker ,(make-hash-table :test 'equal :synchronized t))))
 
-(defun elapsed-time (tag)
-  "Computes time elapsed since calling mark-time with TAG."
-  (/ (- (get-internal-real-time) (gethash tag *dc-timings*))
-     (float internal-time-units-per-second)))
+(defun mark-time (time-tracker tag &key any-thread)
+  "Marks the current time with TAG, for the purpose of later retrieving elapsed time.  You must pass in a TIME-TRACKER object, which you can create with the make-time-tracker function.  When you call mark-time from multiple threads, mark-time makes TAG visible only to the calling thread.  If two threads use the same TAG value to mark the time, the mark-time and elapsed time functions behave as if the TAG values were different.  You can change this behavior by passing T for ANY-THREAD, which causes a TAG to be global across threads.  See the elapsed-time function."
+  (let* ((time-tracker (ds-get time-tracker :time-tracker))
+         (mark (get-internal-real-time))
+         (mark-name (if any-thread
+                        tag
+                        (format nil "~a-~a"
+                            (sb-thread:thread-name sb-thread:*current-thread*)
+                            tag))))
+    (with-locked-hash-table (time-tracker)
+      (setf (gethash mark-name time-tracker) mark))
+    mark))
 
-(defun document-package (package output-filename)
-  "Documents the Common Lisp package PACKAGE and writes that documentation to the file given by OUTPUT-FILENAME."
+(defun elapsed-time (time-tracker tag &key any-thread)
+  "Computes time elapsed since calling mark-time with TAG.  You must pass in a TIME-TRACKER object, which you can create with the make-time-tracker function.  When you call elapsed-time from multiple threads, elapsed-time associates TAG with the calling thread.  If two threads use the same TAG value to fetch elapsed time, the mark-time and elapsed time functions behave as if the TAG values were different.  You can change this behavior by passing T for ANY-THREAD, which causes TAG to be global across threads.  See the mark-time function."
+  (let* ((time-tracker (ds-get time-tracker :time-tracker))
+         (mark-name (if any-thread
+                        tag
+                        (format nil "~a-~a"
+                            (sb-thread:thread-name sb-thread:*current-thread*)
+                            tag))))
+    (/ (- (get-internal-real-time)
+          (with-locked-hash-table (time-tracker)
+            (gethash mark-name time-tracker)))
+       (float internal-time-units-per-second))))
+
+(defun document-package (package output-filename &key overview-file license-file)
+  "Documents the Common Lisp package PACKAGE and writes that documentation to the file given by OUTPUT-FILENAME.  If you provide file name for overview-file or license-file, document-package includes the contents of those files in the documentation it creates."
   (loop for function being the external-symbols of (find-package package)
      when (and (fboundp function) (documentation (symbol-function function) t))
      collect
@@ -929,7 +956,7 @@ or like this:
        (return (loop for function in 
                     (sort functions #'string<
                           :key (lambda (x) (getf x :function-name)))
-                  collect (format nil "## ~a ~a~%~a"
+                  collect (format nil "### ~a ~a~%~a"
                                   (string-downcase (getf function :function-name))
                                   (replace-regexs
                                    (format nil "~s"
@@ -939,5 +966,22 @@ or like this:
                                      ("DC-UTILITIES::" "")))
                                   (getf function :documentation))
                   into function-docs
-                    finally (spew (format nil "# ~a~%~{~a~^~%~%~}" package function-docs)
-                                  output-filename)))))
+                  finally
+                    (return
+                      (let* ((parts (remove
+                                     nil
+                                     (list (list "# ~a~%" package)
+                                           (when license-file
+                                             (list "## License~%~a~%"
+                                                   (slurp license-file)))
+                                           (when overview-file
+                                             (list "## Overview~%~a~%"
+                                                   (slurp overview-file)))
+                                           (list "## API~%~{~a~^~%~}~%" function-docs))))
+                             (format-string (format nil "~{~a~}" (mapcar #'car parts)))
+                             (format-values (mapcar #'second parts))
+                             (format-parameters (append (list nil format-string)
+                                                        format-values)))
+                        (spew (apply #'format format-parameters)
+                              output-filename)
+                        package))))))

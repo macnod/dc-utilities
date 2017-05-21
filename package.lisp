@@ -9,6 +9,7 @@
                 :sha512)
   (:export
 
+   *ds-timings*
    alist-values
    bytes-to-uint
    change-per-second
@@ -55,6 +56,7 @@
    load-settings
    lof
    log-entry
+   make-time-tracker
    mark-time
    memoize
    memoize-with-limit
