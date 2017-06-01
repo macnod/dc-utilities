@@ -975,7 +975,7 @@ or like this:
                                   (if (> (length lambda-list) 2)
                                       (format nil "~%(~%~{~%&nbsp;&nbsp;&nbsp;&nbsp;**~a**~%~}~%~%)~%"
                                               lambda-list)
-                                      (format nil "~%(~{**~a**~^ ~})~%" lambda-list))
+                                      (format nil "~%(~{**~a**~^&nbsp;&nbsp; ~})~%" lambda-list))
                                   (replace-regexs
                                    (getf function :documentation)
                                    '(("\\s\\s+" " "))))
