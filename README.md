@@ -71,7 +71,7 @@ Given the function FUNCTION-OR-SYMBOL, who's return value changes over time, or 
 Works just like the mkdir shell command. DIR is the directory you want to create. Use WITH-PARENTS if you want the function to create parent directories as necessary.
 
 ### function  cull-named-params 
-(**NAMED-PARAMS**, **CULL-KEYS**)
+(**NAMED-PARAMS** **CULL-KEYS**)
 
 Given a value for NAMED-PARAMS like this one '(:one 1 :two 2 :three 3) and a list of CULL-KEYS like this one '(:one :two) this function returns a list of named parameters that excludes the names (and their values) that match the names in CULL-KEYS. In the above example, the result is '(:three 3)
 
@@ -250,7 +250,7 @@ Returns a string consisting of the file extension for the file name given in PAT
 Obtain a count of the lines in the file FILENAME using the Linux wc program.
 
 ### macro  filter-file 
-(**&REST**, **ARGS**)
+(**&REST** **ARGS**)
 
 Copies lines from the file INPUT-FILENAME to the file OUTPUT-FILENAME, omitting lines for which BODY returns nil.
 
@@ -265,7 +265,7 @@ Given a nested list L, return a flat list.
 Serializes OBJECT into a string, returning the string.
 
 ### function  freeze-n-spew 
-(**OBJECT**, **FILENAME**)
+(**OBJECT** **FILENAME**)
 
 Serializes OBJECT into a string and writes the string to the file specified by FILENAME.
 
@@ -300,17 +300,17 @@ Accepts a list of values L and puts the values in a hash table, keying each valu
 Interrupts an active timer set with another thread using the interruptible-sleep function. The NAME parameter specifies the name of the timer to interrupt.
 
 ### function  interruptible-sleep 
-(**SECS**, **NAME**)
+(**SECS** **NAME**)
 
 Sets up a named timer and sleeps for SECS seconds or until another thread calls the interrupt-sleep function with NAME. This function checks once per second to see if the timer has been reached or interrupted.
 
 ### function  join-paths 
-(**&REST**, **PATH-PARTS**)
+(**&REST** **PATH-PARTS**)
 
 Joins elements of PATH-PARTS into a file path, inserting slashes where necessary.
 
 ### function  k-combination 
-(**K**, **N**)
+(**K** **N**)
 
 Computes the k-combination value for K and N.
 
@@ -325,7 +325,7 @@ Returns the keys (properties) of the property list PLIST
 Returns the values of the property list PLIST
 
 ### function  load-settings 
-(**&REST**, **FILEPATHS**)
+(**&REST** **FILEPATHS**)
 
 Accepts one or more file paths, collected in FILEPATHS, and reads settings from the given files, with settings in later files overriding the same settings in earlier files. Each settings file is a Lisp file with a dc-utilities data structure.
 
@@ -335,7 +335,7 @@ Accepts one or more file paths, collected in FILEPATHS, and reads settings from 
 Returns the length of the file FILENAME.
 
 ### function  log-entry 
-(**&REST**, **MESSAGES**)
+(**&REST** **MESSAGES**)
 
 Accepts one or more strings, concatenates them, precedes the result with a timestamp, and returns a string that looks like a log entry.
 
@@ -366,7 +366,7 @@ Marks the current time with TAG, for the purpose of later retrieving elapsed tim
 Incorporate caching into a function, specified by the symbol FUNCTION-SYMBOL, so that when the function is called with the same parameter a second time, it can retrieve the result from the cache instead of having to compute the result again.
 
 ### function  memoize-with-limit 
-(**FUNCTION-SYMBOL**, **LIMIT**)
+(**FUNCTION-SYMBOL** **LIMIT**)
 
 Like memoize, but limits the size of the cache. If more elements than LIMIT are cached when a new element needs to be cached, the oldest element is evicted from the cache to make room for the new one. This is an excellent memoizing function to use when the function frequently returns a limited set of values, but has an infinite range.
 
@@ -417,12 +417,12 @@ Returns a list of values between START and END (inclusive), skipping values by S
 Reads a single line from STREAM and returns the line as a string. You can specify the end-of-line character with EOL, which defaults to :unix. The other option is :dos. If no end-of-line character is found before the line reaches a length of MAX-LENGTH, a line of length MAX-LENGTH is returned.
 
 ### function  read-settings-file 
-(**&REST**, **FILEPATHS**)
+(**&REST** **FILEPATHS**)
 
 Accepts one or more parameters, collected in FILEPATHS, that are the names of settings files. Reads the settings files in the order provided, with settings in later files overriding settings in earlier files. A settings file is a Lisp file with a dc-utilities data structure (see the function ds). This function returns a settings data structure. Normally, you wouldn't use this function. Instead, use the load-settings function at the beginning of your program (or when it needs to reload settings) and then use the setting function to retrieve values.
 
 ### function  replace-extension 
-(**FILENAME**, **NEW-EXTENSION**)
+(**FILENAME** **NEW-EXTENSION**)
 
 This function replaces the file extension in FILENAME with the file extension provided in NEW-EXTENSION.
 
@@ -487,7 +487,7 @@ Converts SEQUENCE, a sequence of bytes, into a sequence of unsigned integers of 
 Converts SEQUENCE, a sequence of unsigned integers, into a list of bytes. The SIZE parameter specifies the byte-size of the integers in SEQUENCE, and defaults to 4.
 
 ### function  setting 
-(**&REST**, **KEYS**)
+(**&REST** **KEYS**)
 
 Accepts one or more parameters, collected in KEYS, which are used to traverse the settings data structure to locate the desired value.
 
@@ -567,17 +567,17 @@ Writes the contents of STRING to the file specified by FILENAME. Use the CREATE-
 Splits STRING into substrings on ON-REGEX, then trims FAT from each substring. The ON-REGEX parameter value, which is optional, defaults to "\s+", which is to say that the string is split into a list of words at the whitespace boundaries. The default value for FAT, which is also optional, "\s+|\s+$", causes this function to trim whitespace from the beggining and end of each substring. Here's an example: (split-n-trim "Hello beautiful world!") => '("Hello" "beautiful" "world!")
 
 ### function  store-delete 
-(**ROOT**, **KEY**)
+(**ROOT** **KEY**)
 
 Deletes the file specified by ROOT and KEY. See the store-save and store-path functions for information about how ROOT and KEY are treated.
 
 ### function  store-fetch 
-(**ROOT**, **KEY**)
+(**ROOT** **KEY**)
 
 Reads the content of the file specified by ROOT and KEY, and deserializes that content into an object. See the store-save and and store-path functions for information about how ROOT and KEY are treated.
 
 ### function  store-path 
-(**ROOT**, **FILENAME**)
+(**ROOT** **FILENAME**)
 
 Computes a path from ROOT (a root folder) and FILENAME, a regular file. This is useful for when you plan to write many more files than can be held in a single directory. This function will help you create a tree of directories for the files that you want to store. FILENAME must have at least 15 characters, and the last 15 characters of FILENAME must be alphanumeric characters.
 
@@ -648,12 +648,12 @@ Stops all the threads in the thread-pool POOL-NAME.
 Retrieves the stop-time for the thread-pool named in POOL-NAME.
 
 ### function  thread-pool-time-to-go 
-(**POOL-NAME**, **TOTAL-RECORD-COUNT**)
+(**POOL-NAME** **TOTAL-RECORD-COUNT**)
 
 Returns the amount of time left for the thread pool given by POOL-NAME to complete processing all the records, the total number of which is given in TOTAL-RECORD-COUNT.
 
 ### function  time-to-go 
-(**CHANGE-PER-SECOND**, **RECORD-COUNT**)
+(**CHANGE-PER-SECOND** **RECORD-COUNT**)
 
 Given the number of records per second that are being processed (given in CHANGE-PER-SECOND) and the nuber of records remaining (given in RECORD-COUNT), this function computes the amount of time still left before all the records have been processed.
 
@@ -728,7 +728,7 @@ Returns a fairly unique short string
 Return t if STRING matches the REGEX exactly. Use the IGNORE-CASE parameter if you want case-insensitve matches.
 
 ### macro  with-lines-in-file 
-(**&REST**, **ARGS**)
+(**&REST** **ARGS**)
 
 Lambda list is `((LINE FILENAME) &BODY BODY)`. Sequentially assigns each line in the file given by FILENAME to LINE and runs BODY for each line.
 
