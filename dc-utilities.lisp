@@ -65,7 +65,7 @@
            (\"wa[a-z]\" \"is\"))
          :ignore-case t)
 
-==> \"Tracy is beautiful.  Tracy is smart.  Tracy is sexy\""
+    ==> \"Tracy is beautiful.  Tracy is smart.  Tracy is sexy\""
   (let ((ttext text))
     (loop for rp in list-of-regex-replacement-pairs
        do (setf ttext (ppcre:regex-replace-all
@@ -92,8 +92,8 @@
        string)
     (and a b (zerop a) (= b (length string)))))
 
-(defun shell-execute (program &optional (parameters nil) (input-pipe-data ""))
-  "Run PROGRAM and return the output of the program as a string.  You can pass an atom or a list for PARAMETERS (the command-line options for the program). You can also pipe data to the program by passing the INPUT-PIPE-DATA parameter with a string containing the data you want to pipe."
+(defun shell-execute (program &optional parameters (input-pipe-data ""))
+  "Run PROGRAM and return the output of the program as a string.  You can pass an atom or a list for PARAMETERS (the command-line options for the program). You can also pipe data to the program by passing the INPUT-PIPE-DATA parameter with a string containing the data you want to pipe.  The INPUT-PIPE-DATA parameter defaults to the empty string."
   (let ((parameters (cond ((null parameters) nil)
                           ((atom parameters) (list parameters))
                           (t parameters))))
@@ -108,7 +108,7 @@
            (shell-execute "wc" `("-l" ,filename)) :junk-allowed t)))
 
 (defmacro with-lines-in-file ((line filename) &body body)
-  "Sequentially assigns each line in the file given by FILENAME to LINE and runs BODY for each line."
+  "Lambda list is `((LINE FILENAME) &BODY BODY)`.  Sequentially assigns each line in the file given by FILENAME to LINE and runs BODY for each line."
   (let ((file (gensym)))
     `(with-open-file (,file ,filename)
       (do ((,line (read-line ,file nil) (read-line ,file nil)))
@@ -248,7 +248,7 @@
            (random 1000000000))))
 
 (defun split-n-trim (string &key (on-regex "\\s+") (fat "^\\s+|\\s+$"))
-  "Splits STRING into substrings on SPLITTER-REGEX, then trims FAT from each substring.  The SPLITTER-REGEX parameter value, which is optional, defaults to \\s+, which is to say that the string is split into a list of words at the whitespace boundaries.  The default value for FAT, which is also optional, causes this function to trim whitespace from the beggining and end of each substring.  Here's an example:
+  "Splits STRING into substrings on ON-REGEX, then trims FAT from each substring.  The ON-REGEX parameter value, which is optional, defaults to \"\\s+\", which is to say that the string is split into a list of words at the whitespace boundaries.  The default value for FAT, which is also optional, \"\\s+|\\s+$\", causes this function to trim whitespace from the beggining and end of each substring.  Here's an example:
 
     (split-n-trim \"Hello  beautiful      world!\")
 
@@ -636,7 +636,7 @@ or like this:
     (if shuffle (shuffle range) range)))
 
 (defun change-per-second (function-or-symbol &optional (seconds 1))
-  "Given the function FUNCTION-OR-SYMBOL, who's return value changes over time, or a variable who's value changes over time, with the change being unidirectional, this function computes the rate of change by calling the function, sleeping, then calling the function again, then computing the rate of change per second.  You can optionally specify the number of seconds to wait between calls.  If FUNCTION-OR-SYMBOL is a variable, then this function retrieves the value of the variable, sleeps, then retrieves the value of the variable again." 
+  "Given the function FUNCTION-OR-SYMBOL, who's return value changes over time, or a variable who's value changes over time, with the change being unidirectional, this function computes the rate of change by calling the function, sleeping SECONDS seconds, calling the function again, then computing the rate of change per second.  You can optionally specify the number of seconds to wait between calls with the SECONDS parameter, which defaults to 1.  If FUNCTION-OR-SYMBOL is a variable, then this function retrieves the value of the variable, sleeps, then retrieves the value of the variable again." 
   (let ((v1 (if (functionp function-or-symbol)
                 (funcall function-or-symbol)
                 (symbol-value function-or-symbol)))
@@ -836,7 +836,7 @@ or like this:
       article)))
 
 (defun uint-to-bytes (i &optional (size 4))
-  "Converts the unsigned integer I into a list of bytes.  The SIZE parameter specifies the byte-size of the integer in I."
+  "Converts the unsigned integer I into a list of bytes.  The SIZE parameter specifies the byte-size of the integer in I and defaults to 4."
   (loop with ff = 255
      for a = i then (ash a -8)
      for b from 1 to size
@@ -849,7 +849,7 @@ or like this:
      summing (* a (expt 2 (* b 8)))))
 
 (defun sequence-uint-to-bytes (sequence &optional (size 4))
-  "Converts SEQUENCE, as sequence of unsigned integers into a list of bytes.  The SIZE parameter specifies the byte-size of the integers in SEQUENCE."
+  "Converts SEQUENCE, a sequence of unsigned integers, into a list of bytes.  The SIZE parameter specifies the byte-size of the integers in SEQUENCE, and defaults to 4."
   (if (vectorp sequence)
       (loop with result = (make-array (* size (length sequence)))
          for a across sequence
@@ -863,7 +863,7 @@ or like this:
            appending (uint-to-bytes a size))))
 
 (defun sequence-bytes-to-uint (sequence &optional (size 4))
-  "Converts SEQUENCE, a sequence of bytes, into a sequence of unsigned integers of byte-size SIZE."
+  "Converts SEQUENCE, a sequence of bytes, into a sequence of unsigned integers of byte-size SIZE, which defaults to 4."
   (if (vectorp sequence)
       (loop with result = (make-array (/ (length sequence) size))
          for source-index from 0 below (length sequence) by size
@@ -946,25 +946,39 @@ or like this:
 (defun document-package (package output-filename &key overview-file license-file)
   "Documents the Common Lisp package PACKAGE and writes that documentation to the file given by OUTPUT-FILENAME.  If you provide file name for overview-file or license-file, document-package includes the contents of those files in the documentation it creates."
   (loop for function being the external-symbols of (find-package package)
-     when (and (fboundp function) (documentation (symbol-function function) t))
+     when (and (fboundp function)
+               (eql (type-of (symbol-function function)) 'function)
+               (documentation function 'function))
      collect
        (list :function function
              :function-name (string-downcase function)
-             :documentation (documentation (symbol-function function) t))
+             :function-type (cond ((macro-function function) "macro ")
+                                  ((regular-function-p function) "function ")
+                                  (t ""))
+             :documentation (documentation function 'function))
      into functions
      finally
        (return (loop for function in 
                     (sort functions #'string<
                           :key (lambda (x) (getf x :function-name)))
-                  collect (format nil "### ~a ~a~%~a"
+                  for lambda-list = (mapcar
+                                     (lambda (x)
+                                       (if (and (listp x)
+                                                (stringp (second x)))
+                                             (format nil "(~a ~s)" (first x) (second x))
+                                           (format nil "~a" x)))
+                                     (sb-introspect:function-lambda-list
+                                      (symbol-function (getf function :function))))
+                  collect (format nil "### ~a ~a ~a~%~a~%"
+                                  (getf function :function-type)
                                   (string-downcase (getf function :function-name))
+                                  (if (> (length lambda-list) 2)
+                                      (format nil "~%(~%~{~%&nbsp;&nbsp;&nbsp;&nbsp;**~a**~%~}~%~%)~%"
+                                              lambda-list)
+                                      (format nil "~%(~{**~a**~^, ~})~%" lambda-list))
                                   (replace-regexs
-                                   (format nil "~s"
-                                           (sb-introspect:function-lambda-list
-                                            (symbol-function (getf function :function))))
-                                   '(("\\s\\s+" " ")
-                                     ("DC-UTILITIES::" "")))
-                                  (getf function :documentation))
+                                   (getf function :documentation)
+                                   '(("\\s\\s+" " "))))
                   into function-docs
                   finally
                     (return
@@ -985,3 +999,10 @@ or like this:
                         (spew (apply #'format format-parameters)
                               output-filename)
                         package))))))
+
+(defun regular-function-p (symbol)
+  "Returns t if SYMBOL is a regular function and not a macro or a special operator."
+  (and (fboundp symbol)
+       (not (macro-function symbol))
+       (not (special-operator-p symbol))))
+
