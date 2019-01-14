@@ -1006,3 +1006,37 @@ or like this:
        (not (macro-function symbol))
        (not (special-operator-p symbol))))
 
+(defun hashify-list (list
+                     &key (method :count) 
+                       (f-key (lambda (x) x))
+                       (f-value (lambda (key-raw key-clean value)
+                                  (declare (ignore key-raw key-clean value))
+                                  1))
+                       (initial-value 0))
+  "Takes a list and returns a hash table. If you don't pass any parameters other than the list, this function returns a hashtable where the list elements are the keys and the values correspond to the counts of the distinct list elements."
+  (let ((h (make-hash-table :test 'equal)))
+    (case method
+      (:count (loop for k in list do (incf (gethash k h 0))))
+      (:custom (loop for k-raw in list
+                  for k-clean = (funcall f-key k-raw)
+                  for value-old = (gethash k-clean h initial-value)
+                  for value-new = (funcall f-value k-raw k-clean value-old)
+                  do (setf (gethash k-clean h) value-new)))
+      (:merged-pairs (loop for (k-raw value) in (find-pairs list)
+                        for k-clean = (funcall f-key k-raw)
+                        do (setf (gethash k-clean h) value)))
+      (:pairs (loop for (k-raw value) in list
+                   for k-clean = (funcall f-key k-raw)
+                   do (setf (gethash k-clean h) value))))
+    h))
+            
+(defun hash-to-list (hash)
+  (loop for k being the hash-keys in hash using (hash-value v)
+       collect (list k v)))
+
+(defun find-pairs (list)
+  (if (null list) nil
+      (let ((k (pop list))
+            (v (pop list)))
+        (cons (list k v) (find-pairs list)))))
+              
