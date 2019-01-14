@@ -1010,13 +1010,15 @@ or like this:
                      &key (method :count) 
                        (f-key (lambda (x) x))
                        (f-value (lambda (key-raw key-clean value)
-                                  (declare (ignore key-raw key-clean value))
-                                  1))
+                                  (declare (ignore key-raw key-clean))
+                                  value))
                        (initial-value 0))
-  "Takes a list and returns a hash table. If you don't pass any parameters other than the list, this function returns a hashtable where the list elements are the keys and the values correspond to the counts of the distinct list elements."
+  "Takes a list and returns a hash table, using the specified method. Supported methods, specified via the :method key,are :count, :merged-pairs, :pairs, and :custom.  With the :count method, which the function uses by default if no method is specified,causes the function to create a hash table in which the keys are the distinct items of the list and the value for each key is the count of that distinct element in the list.  The :pairs method assumes that the list contains key/value pairs and looks like this: '((key1 value1) (key2 value2) (key3 value3)...).  The :merged-pairs method works just like the :pairs method, but expects a list that looks like this: '(key1 value1 key2 value2 key3 value3 ...).  The :custom method requires that you provide functions for computing the key from the element in the list and for computing the value given the element, the computed key, and the existing hash value currently associated with the computed key.  If there's no hash value associated with the computed key, then the value specified via :initial-value is used. The :count, :pairs, and :merged-pairs methods allow you to specify functions for computing the key (given the element) and the value (given the element, the computed key, and the existing value)."
   (let ((h (make-hash-table :test 'equal)))
     (case method
-      (:count (loop for k in list do (incf (gethash k h 0))))
+      (:count (loop for k-raw in list
+                 for k-clean = (funcall f-key k-raw)
+                 do (incf (gethash k-clean h 0))))
       (:custom (loop for k-raw in list
                   for k-clean = (funcall f-key k-raw)
                   for value-old = (gethash k-clean h initial-value)
@@ -1024,10 +1026,12 @@ or like this:
                   do (setf (gethash k-clean h) value-new)))
       (:merged-pairs (loop for (k-raw value) in (find-pairs list)
                         for k-clean = (funcall f-key k-raw)
-                        do (setf (gethash k-clean h) value)))
+                        for value-new = (funcall f-value k-raw k-clean value)
+                        do (setf (gethash k-clean h) value-new)))
       (:pairs (loop for (k-raw value) in list
                    for k-clean = (funcall f-key k-raw)
-                   do (setf (gethash k-clean h) value))))
+                   for value-new = (funcall f-value k-raw k-clean value)
+                   do (setf (gethash k-clean h) value-new))))
     h))
             
 (defun hash-to-list (hash)
