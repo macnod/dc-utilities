@@ -20,6 +20,7 @@
 (defparameter *dc-thread-pool-progress* nil)
 (defparameter *dc-thread-pool-start-time* nil)
 (defparameter *dc-thread-pool-stop-time* nil)
+(defparameter *dc-thread-pool-done* nil)
 (defparameter *dc-timings* (make-hash-table :test #'equal :synchronized t))
 
 (defun to-ascii (s)
@@ -55,6 +56,11 @@
 (defun log-entry (&rest messages)
   "Accepts one or more strings, concatenates them, precedes the result with a timestamp, and returns a string that looks like a log entry."
   (timestamp :string (format nil "~{~a~}~%" messages)))
+
+(defun write-log-entry (stream &rest messages)
+  "Accepts one or more strings, concatenates them, precedes the result with a timestamp, and writes a string that looks like a lo
+g entry to the given stream."
+  (format stream "~a" (apply #'log-entry messages)))
 
 (defun replace-regexs (text list-of-regex-replacement-pairs &key ignore-case)
   "Searches through TEXT for substrings that match the regexs in LIST-OF-REGEX-REPLACEMENTS and replaces those substrings with the corresponding replacements in LIST-OF-REGEX-REPLACEMENTS.  Use the IGNORE-CASE parameter if you want case-insensitive matches.  Here's an example:
@@ -698,6 +704,7 @@ or like this:
   (setf (getf *dc-thread-pool-start-time* pool-name)
         (get-universal-time))
   (setf (getf *dc-thread-pool-stop-time* pool-name) nil)
+  (setf (getf *dc-thread-pool-done* pool-name) nil)
   (make-thread
    (lambda ()
      (let* ((get-job (if (eql (type-of job-queue) 'function)
@@ -716,7 +723,7 @@ or like this:
                   (make-thread
                    (lambda ()
                      (loop for job = (funcall get-job)
-                        while job
+                        while (and job (not (getf *dc-thread-pool-done* pool-name)))
                         do (funcall fn-job standard-output job)
                           (with-mutex
                               ((getf *dc-progress-mutex* pool-name))
