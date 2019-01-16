@@ -92,8 +92,8 @@ g entry to the given stream."
 
 (defun verify-string (string regex &key ignore-case)
   "Return t if STRING matches the REGEX exactly.  Use the IGNORE-CASE parameter if you want case-insensitve matches."
-  (multiple-value-bind (a b) 
-      (scan 
+  (multiple-value-bind (a b)
+      (scan
        (if ignore-case (concatenate 'string "(?is)" regex) regex)
        string)
     (and a b (zerop a) (= b (length string)))))
@@ -341,7 +341,7 @@ and a list of CULL-KEYS like this one
 
 this function returns a list of named parameters that excludes the names (and their values) that match the names in CULL-KEYS.  In the above example, the result is
 
-    '(:three 3)" 
+    '(:three 3)"
   (let ((cull-keys (if (listp cull-keys) cull-keys (list cull-keys))))
     (loop for key in
          (remove-if (lambda (x) (member x cull-keys))
@@ -477,7 +477,7 @@ or like this:
     (t (list parent-keys))))
 
 (defun ds-type (ds)
-  "Given a dc-utilities data structure DS, this function returns the type of the data structure.  Valid return values include 'string, 'sequence, 'hash-table, and some Common Lisp types." 
+  "Given a dc-utilities data structure DS, this function returns the type of the data structure.  Valid return values include 'string, 'sequence, 'hash-table, and some Common Lisp types."
   (let* ((a (type-of ds))
          (b (string-downcase (format nil "~a" a))))
     (cond ((ppcre:scan
@@ -642,7 +642,7 @@ or like this:
     (if shuffle (shuffle range) range)))
 
 (defun change-per-second (function-or-symbol &optional (seconds 1))
-  "Given the function FUNCTION-OR-SYMBOL, who's return value changes over time, or a variable who's value changes over time, with the change being unidirectional, this function computes the rate of change by calling the function, sleeping SECONDS seconds, calling the function again, then computing the rate of change per second.  You can optionally specify the number of seconds to wait between calls with the SECONDS parameter, which defaults to 1.  If FUNCTION-OR-SYMBOL is a variable, then this function retrieves the value of the variable, sleeps, then retrieves the value of the variable again." 
+  "Given the function FUNCTION-OR-SYMBOL, who's return value changes over time, or a variable who's value changes over time, with the change being unidirectional, this function computes the rate of change by calling the function, sleeping SECONDS seconds, calling the function again, then computing the rate of change per second.  You can optionally specify the number of seconds to wait between calls with the SECONDS parameter, which defaults to 1.  If FUNCTION-OR-SYMBOL is a variable, then this function retrieves the value of the variable, sleeps, then retrieves the value of the variable again."
   (let ((v1 (if (functionp function-or-symbol)
                 (funcall function-or-symbol)
                 (symbol-value function-or-symbol)))
@@ -965,7 +965,7 @@ or like this:
              :documentation (documentation function 'function))
      into functions
      finally
-       (return (loop for function in 
+       (return (loop for function in
                     (sort functions #'string<
                           :key (lambda (x) (getf x :function-name)))
                   for lambda-list = (mapcar
@@ -1014,7 +1014,7 @@ or like this:
        (not (special-operator-p symbol))))
 
 (defun hashify-list (list
-                     &key (method :count) 
+                     &key (method :count)
                        (f-key (lambda (x) x))
                        (f-value (lambda (key-raw key-clean value)
                                   (declare (ignore key-raw key-clean))
@@ -1040,7 +1040,7 @@ or like this:
                    for value-new = (funcall f-value k-raw k-clean value)
                    do (setf (gethash k-clean h) value-new))))
     h))
-            
+
 (defun hash-to-list (hash)
   (loop for k being the hash-keys in hash using (hash-value v)
        collect (list k v)))
@@ -1050,4 +1050,3 @@ or like this:
       (let ((k (pop list))
             (v (pop list)))
         (cons (list k v) (find-pairs list)))))
-              
