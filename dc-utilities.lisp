@@ -1050,3 +1050,33 @@ or like this:
       (let ((k (pop list))
             (v (pop list)))
         (cons (list k v) (find-pairs list)))))
+              
+(defun choose-from-list (list n)
+  (loop with h = (make-hash-table :test 'equal)
+     and l = (length list)
+     for a from 1 to n
+     for b = (loop for c = (random l)
+                while (gethash c h)
+                finally (setf (gethash c h) t)
+                  (return c))
+     collect b))
+
+(defun index-of-max (list)
+  (if (arrayp list)
+      (loop for index from 0 below (length list)
+         for item across list
+         for max-index = 0 then (if (> item max) index max-index)
+         for max = item then (if (> item max) item max)
+         finally (return max-index))
+      (loop for index from 0 below (length list)
+         for item in list
+         for max-index = 0 then (if (> item max) index max-index)
+         for max = item then (if (> item max) item max)
+         finally (return max-index))))
+
+(defun partition (sequence cell-size)
+  (let ((list (if (vectorp sequence)
+                  (map 'list 'identity sequence)
+                  sequence)))
+    (loop for cell on list by #'(lambda (list) (nthcdr cell-size list))
+       collecting (subseq cell 0 cell-size))))

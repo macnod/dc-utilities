@@ -13,6 +13,7 @@
    alist-values
    bytes-to-uint
    change-per-second
+   choose-from-list
    command-line-options
    create-directory
    cull-named-params
@@ -46,6 +47,7 @@
    hash-values
    home-settings-file
    home-based
+   index-of-max
    index-values
    interrupt-sleep
    interruptible-sleep
@@ -61,6 +63,7 @@
    memoize
    memoize-with-limit
    parse-number
+   partition
    path-only
    range
    read-one-line
@@ -100,7 +103,7 @@
    trim
    uint-to-bytes
    unique-name
-   unique-filename
+   unique-file-name
    unshift
    verify-string
    with-lines-in-file
