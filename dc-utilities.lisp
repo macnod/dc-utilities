@@ -21,7 +21,20 @@
 (defparameter *dc-thread-pool-start-time* nil)
 (defparameter *dc-thread-pool-stop-time* nil)
 (defparameter *dc-thread-pool-done* nil)
+(defparameter *dc-thread-pool-done-mutex* nil)
+(defparameter *dc-thread-pool-collector* nil)
+(defparameter *dc-thread-pool-collector-mutex* nil)
 (defparameter *dc-timings* (make-hash-table :test #'equal :synchronized t))
+(defvar *unix-epoch-difference* (encode-universal-time 0 0 0 1 1 1970 0))
+
+(defun universal-to-unix-time (universal-time)
+  (- universal-time *unix-epoch-difference*))
+
+(defun unix-to-universal-time (unix-time)
+  (+ unix-time *unix-epoch-difference*))
+
+(defun unix-time ()
+  (universal-to-unix-time (get-universal-time)))
 
 (defun to-ascii (s)
   "Converts the string S, which may contain non-ascii characters, into a string with nothing but ascii characters.  Non ascii characters are converted into spaces.  If S is a list, this function converts each element of the list into an all-ascii string."
@@ -452,7 +465,17 @@ or like this:
 (defun load-settings (&rest filepaths)
   "Accepts one or more file paths, collected in FILEPATHS, and reads settings from the given files, with settings in later files overriding the same settings in earlier files.  Each settings file is a Lisp file with a dc-utilities data structure."
   (setf *settings*
-        (apply #'read-settings-file filepaths)))
+        (apply #'read-settings-file filepaths))
+  (replace-settings-vars *settings*))
+
+(defun replace-settings-vars (settings)
+  (loop for k being the hash-keys in settings
+     using (hash-value v)
+     when (and (hash-table-p v) 
+               (not (equal k :vars)))
+     do (replace-settings-vars v)
+     when (stringp v) 
+     do (ds-set settings k (replace-regexs v (hash-to-list (setting :vars))))))
 
 (defun setting (&rest keys)
   "Accepts one or more parameters, collected in KEYS, which are used to traverse the settings data structure to locate the desired value."
@@ -692,53 +715,82 @@ or like this:
     (&key (pool-name (error "pool-name parameter is required"))
        (thread-count (error "thread-count parameter is required"))
        (job-queue (error "job-queue paramater is required"))
-       (fn-job (error "fn-job parameter is required"))
-       (standard-output *standard-output*)
-       fn-finally)
+       (fn-job (error "fn-job parameter is required")))
   "Starts THREAD-COUNT threads using POOL-NAME (a keyword symbol) to name the threads and runs FN-JOB with those threads.  Each thread runs FN-JOB, which takes no parameters, in a loop.  When all the threads are done, this function checks FN-FINALLY.  If the caller provides FN-FINALLY, then this function returns with the result of calling FN-FINALLY.  If the caller doesn't provide FN-FINALLY, then the this function exits with a sum of the return values of all the threads that ran."
-  (setf (getf *dc-thread-pool-progress* pool-name) 0)
-  (setf (getf *dc-progress-mutex* pool-name)
-        (make-mutex :name (symbol-name pool-name)))
-  (setf (getf *dc-job-queue-mutex* pool-name)
-        (make-mutex :name (symbol-name pool-name)))
-  (setf (getf *dc-thread-pool-start-time* pool-name)
-        (get-universal-time))
-  (setf (getf *dc-thread-pool-stop-time* pool-name) nil)
-  (setf (getf *dc-thread-pool-done* pool-name) nil)
+  (thread-pool-init-variables pool-name)
   (make-thread
    (lambda ()
-     (let* ((get-job (if (eql (type-of job-queue) 'function)
-                         job-queue
-                         (progn
-                           (setf (getf *dc-job-queue* pool-name)
-                                 (copy-list job-queue))
-                           (lambda ()
-                             (with-mutex ((getf *dc-job-queue-mutex* pool-name))
-                               (pop (getf *dc-job-queue* pool-name)))))))
+     (let* ((fn-collect
+             (lambda (x)
+               (setf (getf *dc-thread-pool-collector* pool-name)
+                     (cons x (getf *dc-thread-pool-collector* pool-name)))))
+            (fn-get-next-job
+             (if (eql (type-of job-queue) 'function)
+                 job-queue
+                 (progn (setf (getf *dc-job-queue* pool-name)
+                              (copy-list job-queue))
+                        (lambda ()
+                          (let ((job (with-mutex 
+                                         ((getf *dc-job-queue-mutex* pool-name))
+                                       (pop (getf *dc-job-queue* pool-name)))))
+                            (when job
+                              (incf (getf *dc-thread-pool-progress* pool-name)))
+                            job)))))
+            (fn-mark-done
+             (lambda ()
+               (with-mutex ((getf *dc-thread-pool-done-mutex* pool-name))
+                 (setf (getf *dc-thread-pool-done* pool-name) t))))
+            (fn-check-done
+             (lambda () (getf *dc-thread-pool-done* pool-name)))
             (threads
-             (loop
-                for a from 1 to thread-count
+             (loop for a from 1 to thread-count
                 for name = (format nil "~a-~3,'0d" pool-name a)
                 collect
-                  (make-thread
-                   (lambda ()
-                     (loop for job = (funcall get-job)
-                        while (and job (not (getf *dc-thread-pool-done* pool-name)))
-                        do (funcall fn-job standard-output job)
-                          (with-mutex
-                              ((getf *dc-progress-mutex* pool-name))
-                            (incf (getf *dc-thread-pool-progress* pool-name)))
-                        summing 1))
-                   :name name))))
-       (loop for thread in threads
-          summing (or (sb-thread:join-thread thread) 0) into total
-          finally (progn
-                    (setf (getf *dc-thread-pool-stop-time* pool-name)
-                          (get-universal-time))
-                    (return (if fn-finally
-                                (funcall fn-finally standard-output)
-                                total))))))
-   :name (format nil "~a-000" pool-name)))
+                  (make-thread (job-thread fn-get-next-job
+                                           fn-job
+                                           pool-name
+                                           fn-collect
+                                           fn-mark-done
+                                           fn-check-done)
+                               :name name))))
+       (loop for thread in threads do (sb-thread:join-thread thread))))
+     :name (format nil "~a-000" pool-name)))
+
+(defun thread-pool-init-variables (pool-name)
+  (setf (getf *dc-thread-pool-progress* pool-name) 0
+
+        (getf *dc-progress-mutex* pool-name)
+        (make-mutex :name (symbol-name pool-name))
+
+        (getf *dc-job-queue-mutex* pool-name)
+        (make-mutex :name (symbol-name pool-name))
+
+        (getf *dc-thread-pool-start-time* pool-name)
+        (get-universal-time)
+
+        (getf *dc-thread-pool-stop-time* pool-name) nil
+
+        (getf *dc-thread-pool-done-mutex* pool-name)
+        (make-mutex :name (symbol-name pool-name))
+
+        (getf *dc-thread-pool-collector-mutex* pool-name)
+        (make-mutex :name (symbol-name pool-name))
+
+        (getf *dc-thread-pool-collector* pool-name) nil
+
+        (getf *dc-thread-pool-done* pool-name) nil))
+
+(defun job-thread (fn-get-next-job 
+                   fn-job 
+                   pool-name 
+                   fn-collect 
+                   fn-mark-done 
+                   fn-check-done)
+  (lambda ()
+    (loop for job = (funcall fn-get-next-job)
+       while (and job (not (getf *dc-thread-pool-done* pool-name)))
+       for result = (funcall fn-job job fn-check-done fn-mark-done)
+       when result do (funcall fn-collect result))))
 
 (defun thread-pool-stop (pool-name)
   "Stops all the threads in the thread-pool POOL-NAME."
@@ -753,6 +805,9 @@ or like this:
        (sleep 3)
      finally (sb-thread:list-all-threads)))
 
+(defun thread-pool-result (pool-name)
+  (with-mutex ((getf *dc-thread-pool-collector-mutex* pool-name))
+    (getf *dc-thread-pool-collector* pool-name)))
 
 ;;
 ;; Math
@@ -1020,7 +1075,7 @@ or like this:
                                   (declare (ignore key-raw key-clean))
                                   value))
                        (initial-value 0))
-  "Takes a list and returns a hash table, using the specified method. Supported methods, specified via the :method key,are :count, :merged-pairs, :pairs, and :custom.  With the :count method, which the function uses by default if no method is specified,causes the function to create a hash table in which the keys are the distinct items of the list and the value for each key is the count of that distinct element in the list.  The :pairs method assumes that the list contains key/value pairs and looks like this: '((key1 value1) (key2 value2) (key3 value3)...).  The :merged-pairs method works just like the :pairs method, but expects a list that looks like this: '(key1 value1 key2 value2 key3 value3 ...).  The :custom method requires that you provide functions for computing the key from the element in the list and for computing the value given the element, the computed key, and the existing hash value currently associated with the computed key.  If there's no hash value associated with the computed key, then the value specified via :initial-value is used. The :count, :pairs, and :merged-pairs methods allow you to specify functions for computing the key (given the element) and the value (given the element, the computed key, and the existing value)."
+  "Takes a list and returns a hash table, using the specified method. Supported methods, specified via the :method key, are :count, :plist, :alist, and :custom.  With the :count method, which the function uses by default if no method is specified, the function to creates a hash table in which the keys are the distinct items of the list and the value for each key is the count of that distinct element in the list.  The :alist method assumes that the list contains key/value pairs and looks like this: '((key1 . value1) (key2 . value2) (key3 . value3)...).  The :plist method works just like the :alist method, but expects a list that looks like this: '(key1 value1 key2 value2 key3 value3 ...).  The :custom method requires that you provide functions for computing the key from the element in the list and for computing the value given the element, the computed key, and the existing hash value currently associated with the computed key.  If there's no hash value associated with the computed key, then the value specified via :initial-value is used. The :count, :pairs, and :merged-pairs methods allow you to specify functions for computing the key (given the element) and the value (given the element, the computed key, and the existing value)."
   (let ((h (make-hash-table :test 'equal)))
     (case method
       (:count (loop for k-raw in list
@@ -1031,19 +1086,23 @@ or like this:
                   for value-old = (gethash k-clean h initial-value)
                   for value-new = (funcall f-value k-raw k-clean value-old)
                   do (setf (gethash k-clean h) value-new)))
-      (:merged-pairs (loop for (k-raw value) in (find-pairs list)
-                        for k-clean = (funcall f-key k-raw)
-                        for value-new = (funcall f-value k-raw k-clean value)
-                        do (setf (gethash k-clean h) value-new)))
-      (:pairs (loop for (k-raw value) in list
-                   for k-clean = (funcall f-key k-raw)
-                   for value-new = (funcall f-value k-raw k-clean value)
-                   do (setf (gethash k-clean h) value-new))))
+      (:plist (loop for (k-raw value) in (find-pairs list)
+                 for k-clean = (funcall f-key k-raw)
+                 for value-new = (funcall f-value k-raw k-clean value)
+                 do (setf (gethash k-clean h) value-new)))
+      (:alist (loop for (k-raw value) in list
+                 for k-clean = (funcall f-key k-raw)
+                 for value-new = (funcall f-value k-raw k-clean value)
+                 do (setf (gethash k-clean h) value-new))))
     h))
 
 (defun hash-to-list (hash)
   (loop for k being the hash-keys in hash using (hash-value v)
        collect (list k v)))
+
+(defun hash-to-plist (hash)
+  (loop for k being the hash-keys in hash using (hash-value v)
+       appending (list k v)))
 
 (defun find-pairs (list)
   (if (null list) nil
@@ -1080,3 +1139,38 @@ or like this:
                   sequence)))
     (loop for cell on list by #'(lambda (list) (nthcdr cell-size list))
        collecting (subseq cell 0 cell-size))))
+
+(defun string-to-keyword (string)
+  (intern (string-upcase string) :keyword))
+
+(defun alist-to-plist (alist &optional remove-star-prefix)
+  (loop for (key . value) in alist
+     appending (list 
+                (if (and remove-star-prefix (scan "^\\*.+" (format nil "~a" key)))
+                    (string-to-keyword
+                     (subseq (format nil "~a" key) 1))
+                    key)
+                (if (and value (listp value))
+                    (alist-to-plist value)
+                    value))))
+
+(defun csv-to-hash-list (filename &key field-names no-keywords)
+  (loop with rows = (cl-csv:read-csv (if (pathnamep filename)
+                                         filename
+                                         (pathname filename)))
+     with field-strings = (or field-names (elt rows 0))
+     with fields = (if no-keywords
+                       field-strings
+                       (mapcar 'string-to-keyword field-strings))
+     for row in (if (not field-names) (cdr rows) rows)
+     collect 
+       (loop with hash = (make-hash-table :test 'equal)
+          for value in row
+          for field in fields
+          do (setf (gethash field hash) value)
+          finally (return hash))))
+       
+(defun csv-to-hash-array (filename &key field-names no-keywords)
+  (map 'vector 'identity (csv-to-hash-list filename
+                                           :field-names field-names
+                                           :no-keywords no-keywords)))

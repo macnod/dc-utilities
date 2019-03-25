@@ -1,7 +1,7 @@
 ;;;; package.lisp
 
 (defpackage :dc-utilities
-  (:use :cl :cl-ppcre :trivial-utf-8 :sb-thread :sb-ext)
+  (:use :cl :cl-ppcre :trivial-utf-8 :sb-thread :sb-ext :cl-csv)
   (:import-from :ironclad
                 :ascii-string-to-byte-array
                 :byte-array-to-hex-string
@@ -11,11 +11,14 @@
 
    *ds-timings*
    alist-values
+   alist-to-plist
    bytes-to-uint
    change-per-second
    choose-from-list
    command-line-options
    create-directory
+   csv-to-hash-array
+   csv-to-hash-list
    cull-named-params
    directory-exists
    distinct-elements
@@ -44,7 +47,10 @@
    freeze-n-spew
    hash-keys
    hash-string
+   hash-to-list
+   hash-to-plist
    hash-values
+   hashify-list
    home-settings-file
    home-based
    index-of-max
@@ -83,6 +89,7 @@
    slurp-n-thaw
    spew
    split-n-trim
+   string-to-keyword
    store-delete
    store-fetch
    store-path
@@ -91,6 +98,7 @@
    thaw
    thread-pool-job-queue
    thread-pool-progress
+   thread-pool-result
    thread-pool-run-time
    thread-pool-start
    thread-pool-start-time
@@ -104,6 +112,9 @@
    uint-to-bytes
    unique-name
    unique-file-name
+   universal-to-unix-time
+   unix-time
+   unix-to-universal-time
    unshift
    verify-string
    with-lines-in-file
