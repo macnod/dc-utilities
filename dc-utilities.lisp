@@ -117,9 +117,13 @@ g entry to the given stream."
                           ((atom parameters) (list parameters))
                           (t parameters))))
     (with-output-to-string (output-stream)
-      (with-input-from-string (input-stream input-pipe-data)
-        (sb-ext:run-program program parameters :search t
-                            :output output-stream :input input-stream)))))
+      (with-output-to-string (error-stream)
+        (with-input-from-string (input-stream input-pipe-data)
+          (sb-ext:run-program program parameters 
+                              :search t
+                              :output output-stream 
+                              :error error-stream
+                              :input input-stream))))))
 
 (defun file-line-count (filename)
   "Obtain a count of the lines in the file FILENAME using the Linux wc program."
@@ -636,6 +640,12 @@ or like this:
    (ironclad:digest-sequence
     'ironclad:sha512 (string-to-utf-8-bytes string))))
 
+(defun hash-hmac-256 (secret text)
+  (let ((hmac (ironclad:make-hmac
+               (ironclad:ascii-string-to-byte-array secret) :sha256)))
+    (ironclad:update-hmac hmac (ironclad:ascii-string-to-byte-array text))
+    (ironclad:byte-array-to-hex-string (ironclad:hmac-digest hmac))))
+
 (defun index-values (l)
   "Accepts a list of values L and puts the values in a hash table, keying each value with the index of the value in the list."
   (loop with hash = (make-hash-table :test 'equal)
@@ -645,18 +655,14 @@ or like this:
      finally (return hash)))
 
 (defun distinct-elements (list)
-  "Accepts a list of elements LIST and returns a new list with distinct elements from the first list.  (Copies the original list, removes duplicate elements from the copy, and returns the copy.)"
+  "Accepts a list of elements LIST and returns a new list with distinct elements from the first list.  The function Copies the original list, removes duplicate elements from the copy, and returns the copy, all while preserving the order of the original list."
   (loop with h = (make-hash-table :test 'equal)
      for v = 0 then (1+ v)
-     for k in list do (unless (gethash k h)
-                        (setf (gethash k h) v))
+     for k in list 
+     when (not (gethash k h)) do (setf (gethash k h) v)
      finally
-       (return (loop for u being the hash-keys of h
-                  collect u into distinct-list
-                  finally
-                    (return (sort distinct-list
-                                  (lambda (a b)
-                                    (< (gethash a h) (gethash b h)))))))))
+       (return (sort (hash-keys h)
+                     (lambda (a b) (< (gethash a h) (gethash b h)))))))
 
 (defun range (start end &key (step 1) (filter #'identity) shuffle)
   "Returns a list of values between START and END (inclusive), skipping values by STEP, filtering remaining values with the function in FILTER, and shuffling the remaining values if SHUFFLE is true.  STEP defaults to 1, FILTER defaults to allowing all values through, and SHUFFLE default to nil."
@@ -1005,62 +1011,62 @@ or like this:
             (gethash mark-name time-tracker)))
        (float internal-time-units-per-second))))
 
-(defun document-package (package output-filename &key overview-file license-file)
-  "Documents the Common Lisp package PACKAGE and writes that documentation to the file given by OUTPUT-FILENAME.  If you provide file name for overview-file or license-file, document-package includes the contents of those files in the documentation it creates."
-  (loop for function being the external-symbols of (find-package package)
-     when (and (fboundp function)
-               (eql (type-of (symbol-function function)) 'function)
-               (documentation function 'function))
-     collect
-       (list :function function
-             :function-name (string-downcase function)
-             :function-type (cond ((macro-function function) "macro ")
-                                  ((regular-function-p function) "function ")
-                                  (t ""))
-             :documentation (documentation function 'function))
-     into functions
-     finally
-       (return (loop for function in
-                    (sort functions #'string<
-                          :key (lambda (x) (getf x :function-name)))
-                  for lambda-list = (mapcar
-                                     (lambda (x)
-                                       (if (and (listp x)
-                                                (stringp (second x)))
-                                             (format nil "(~a ~s)" (first x) (second x))
-                                           (format nil "~a" x)))
-                                     (sb-introspect:function-lambda-list
-                                      (symbol-function (getf function :function))))
-                  collect (format nil "### ~a ~a ~a~%~a~%"
-                                  (getf function :function-type)
-                                  (string-downcase (getf function :function-name))
-                                  (if (> (length lambda-list) 2)
-                                      (format nil "~%(~%~{~%&nbsp;&nbsp;&nbsp;&nbsp;**~a**~%~}~%~%)~%"
-                                              lambda-list)
-                                      (format nil "~%(~{**~a**~^ ~})~%" lambda-list))
-                                  (replace-regexs
-                                   (getf function :documentation)
-                                   '(("\\s\\s+" " "))))
-                  into function-docs
-                  finally
-                    (return
-                      (let* ((parts (remove
-                                     nil
-                                     (list (list "# ~a~%" package)
-                                           (when license-file
-                                             (list "## License~%~a~%"
-                                                   (slurp license-file)))
-                                           (when overview-file
-                                             (list "## Overview~%~a~%"
-                                                   (slurp overview-file)))
-                                           (list "## API~%~{~a~^~%~}~%" function-docs))))
-                             (format-string (format nil "~{~a~}" (mapcar #'car parts)))
-                             (format-values (mapcar #'second parts))
-                             (format-parameters (append (list nil format-string)
-                                                        format-values)))
-                        (spew (apply #'format format-parameters)
-                              output-filename)
-                        package))))))
+;; (defun document-package (package output-filename &key overview-file license-file)
+;;   "Documents the Common Lisp package PACKAGE and writes that documentation to the file given by OUTPUT-FILENAME.  If you provide file name for overview-file or license-file, document-package includes the contents of those files in the documentation it creates."
+;;   (loop for function being the external-symbols of (find-package package)
+;;      when (and (fboundp function)
+;;                (eql (type-of (symbol-function function)) 'function)
+;;                (documentation function 'function))
+;;      collect
+;;        (list :function function
+;;              :function-name (string-downcase function)
+;;              :function-type (cond ((macro-function function) "macro ")
+;;                                   ((regular-function-p function) "function ")
+;;                                   (t ""))
+;;              :documentation (documentation function 'function))
+;;      into functions
+;;      finally
+;;        (return (loop for function in
+;;                     (sort functions #'string<
+;;                           :key (lambda (x) (getf x :function-name)))
+;;                   for lambda-list = (mapcar
+;;                                      (lambda (x)
+;;                                        (if (and (listp x)
+;;                                                 (stringp (second x)))
+;;                                              (format nil "(~a ~s)" (first x) (second x))
+;;                                            (format nil "~a" x)))
+;;                                      (sb-introspect:function-lambda-list
+;;                                       (symbol-function (getf function :function))))
+;;                   collect (format nil "### ~a ~a ~a~%~a~%"
+;;                                   (getf function :function-type)
+;;                                   (string-downcase (getf function :function-name))
+;;                                   (if (> (length lambda-list) 2)
+;;                                       (format nil "~%(~%~{~%&nbsp;&nbsp;&nbsp;&nbsp;**~a**~%~}~%~%)~%"
+;;                                               lambda-list)
+;;                                       (format nil "~%(~{**~a**~^ ~})~%" lambda-list))
+;;                                   (replace-regexs
+;;                                    (getf function :documentation)
+;;                                    '(("\\s\\s+" " "))))
+;;                   into function-docs
+;;                   finally
+;;                     (return
+;;                       (let* ((parts (remove
+;;                                      nil
+;;                                      (list (list "# ~a~%" package)
+;;                                            (when license-file
+;;                                              (list "## License~%~a~%"
+;;                                                    (slurp license-file)))
+;;                                            (when overview-file
+;;                                              (list "## Overview~%~a~%"
+;;                                                    (slurp overview-file)))
+;;                                            (list "## API~%~{~a~^~%~}~%" function-docs))))
+;;                              (format-string (format nil "~{~a~}" (mapcar #'car parts)))
+;;                              (format-values (mapcar #'second parts))
+;;                              (format-parameters (append (list nil format-string)
+;;                                                         format-values)))
+;;                         (spew (apply #'format format-parameters)
+;;                               output-filename)
+;;                         package))))))
 
 (defun regular-function-p (symbol)
   "Returns t if SYMBOL is a regular function and not a macro or a special operator."
@@ -1097,12 +1103,14 @@ or like this:
     h))
 
 (defun hash-to-list (hash)
-  (loop for k being the hash-keys in hash using (hash-value v)
-       collect (list k v)))
+  (when hash
+    (loop for k being the hash-keys in hash using (hash-value v)
+       collect (list k v))))
 
 (defun hash-to-plist (hash)
-  (loop for k being the hash-keys in hash using (hash-value v)
-       appending (list k v)))
+  (when hash
+    (loop for k being the hash-keys in hash using (hash-value v)
+       appending (list k v))))
 
 (defun find-pairs (list)
   (if (null list) nil
@@ -1140,8 +1148,16 @@ or like this:
     (loop for cell on list by #'(lambda (list) (nthcdr cell-size list))
        collecting (subseq cell 0 cell-size))))
 
-(defun string-to-keyword (string)
-  (intern (string-upcase string) :keyword))
+(defun string-to-keyword (string &optional (clean t))
+  (let ((s (if clean
+               (let* ((s1 (string-upcase
+                           (regex-replace-all "[^-a-zA-Z0-9]" string "-")))
+                      (s2 (regex-replace-all "--+" s1 "-"))
+                      (s3 (regex-replace-all "^-+|-+$" s2 ""))
+                      (s4 (if (zerop (length s3)) (unique-name) s3)))
+                 (if (scan "^[A-Z]" s4) s4 (format nil "X-~a" s4)))
+               string)))
+    (intern s :keyword)))
 
 (defun alist-to-plist (alist &optional remove-star-prefix)
   (loop for (key . value) in alist
@@ -1154,23 +1170,40 @@ or like this:
                     (alist-to-plist value)
                     value))))
 
-(defun csv-to-hash-list (filename &key field-names no-keywords)
-  (loop with rows = (cl-csv:read-csv (if (pathnamep filename)
-                                         filename
-                                         (pathname filename)))
-     with field-strings = (or field-names (elt rows 0))
-     with fields = (if no-keywords
-                       field-strings
-                       (mapcar 'string-to-keyword field-strings))
-     for row in (if (not field-names) (cdr rows) rows)
-     collect 
-       (loop with hash = (make-hash-table :test 'equal)
-          for value in row
-          for field in fields
-          do (setf (gethash field hash) value)
-          finally (return hash))))
+(defun csv-to-hash-list (filename &key headers-in-file header-list
+                                    (clean-headers t))
+  (let* ((rows (cl-csv:read-csv 
+                (if (pathnamep filename) filename (pathname filename))))
+         (fields (cond
+                   (headers-in-file
+                    (mapcar (lambda (k) (string-to-keyword k clean-headers))
+                            (car rows)))
+                   (header-list
+                    (mapcar (lambda (k) (string-to-keyword k clean-headers))
+                            header-list))
+                   (t (range 0 (1- (length (car rows))))))))
+    (when (not (= (length (distinct-elements fields))
+                  (length fields)))
+      (setf fields
+            (let ((hash (hashify-list fields)))
+              (loop for field being the hash-keys in hash 
+                 using (hash-value count) appending 
+                   (if (= count 1)
+                       field 
+                       (loop for a from 1 to count
+                          collect (format nil "~a-~a" field a)))))))
+    (loop for row in (if headers-in-file (cdr rows) rows)
+       collect
+         (loop with hash = (make-hash-table :test 'equal)
+            for value in row
+            for field in fields
+            do (setf (gethash field hash) value)
+            finally (return hash)))))
        
 (defun csv-to-hash-array (filename &key field-names no-keywords)
   (map 'vector 'identity (csv-to-hash-list filename
                                            :field-names field-names
                                            :no-keywords no-keywords)))
+
+(defun make-keyword (name)
+  (values (intern name "KEYWORD")))

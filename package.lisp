@@ -45,6 +45,7 @@
    flatten
    freeze
    freeze-n-spew
+   hash-hmac-256
    hash-keys
    hash-string
    hash-to-list
@@ -64,6 +65,7 @@
    load-settings
    lof
    log-entry
+   make-keyword
    make-time-tracker
    mark-time
    memoize
