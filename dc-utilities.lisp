@@ -1229,9 +1229,6 @@ or like this:
                                            :field-names field-names
                                            :no-keywords no-keywords)))
 
-(defun make-keyword (name)
-  (values (intern name "KEYWORD")))
-
 (defun qsort (sequence predicate &key (key 'identity))
   "Non-destructive Quicksort.  The sequence, predicate, and key parameters are the same as in the Common Lisp sort function."
   (when sequence
