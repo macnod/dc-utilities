@@ -47,6 +47,10 @@
    freeze-n-spew
    hash-hmac-256
    hash-keys
+   hash-list-add-column
+   hash-list-column
+   hash-list-columns
+   hash-list-from-csv
    hash-string
    hash-to-list
    hash-to-plist
@@ -73,6 +77,7 @@
    parse-number
    partition
    path-only
+   qsort
    range
    read-one-line
    read-settings-file
