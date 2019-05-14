@@ -1162,7 +1162,8 @@ or like this:
 (defun alist-to-plist (alist &optional remove-star-prefix)
   (loop for (key . value) in alist
      appending (list 
-                (if (and remove-star-prefix (scan "^\\*.+" (format nil "~a" key)))
+                (if (and remove-star-prefix
+                         (scan "^\\*.+" (format nil "~a" key)))
                     (string-to-keyword
                      (subseq (format nil "~a" key) 1))
                     key)
@@ -1170,17 +1171,17 @@ or like this:
                     (alist-to-plist value)
                     value))))
 
-(defun csv-to-hash-list (filename &key headers-in-file header-list
+(defun hash-list-from-csv (filename &key headers-in-file header-list
                                     (clean-headers t))
   (let* ((rows (cl-csv:read-csv 
                 (if (pathnamep filename) filename (pathname filename))))
          (fields (cond
-                   (headers-in-file
-                    (mapcar (lambda (k) (string-to-keyword k clean-headers))
-                            (car rows)))
                    (header-list
                     (mapcar (lambda (k) (string-to-keyword k clean-headers))
                             header-list))
+                   (headers-in-file
+                    (mapcar (lambda (k) (string-to-keyword k clean-headers))
+                            (car rows)))
                    (t (range 0 (1- (length (car rows))))))))
     (when (not (= (length (distinct-elements fields))
                   (length fields)))
@@ -1199,7 +1200,30 @@ or like this:
             for field in fields
             do (setf (gethash field hash) value)
             finally (return hash)))))
-       
+
+(defun hash-list-columns (hash-list column-names)
+  "The result looks like the original hash-list, but with the specified columns only."
+  (loop for row in hash-list
+     collect (loop with h = (make-hash-table :test 'equal)
+                for column in column-names
+                do (setf (gethash column h) (gethash column row))
+                finally (return h))))
+
+(defun hash-list-column (hash-list column-name)
+  "The result looks a list of the values in the given column of hash-list."
+  (loop for row in hash-list collect (gethash column-name row)))
+
+(defun hash-list-add-columns (hash-list &rest key-value-pairs)
+  (unless (zerop (mod (length key-value-pairs) 2))
+    (error "key-value-pairs must be an even number of parameters."))
+  (loop for row in hash-list do
+       (loop for index from 0 below (1- (length key-value-pairs)) by 2
+          for key = (elt key-value-pairs index)
+          for value = (elt key-value-pairs (1+ index))
+          do (setf (gethash key row)
+                   (if (functionp value) (funcall value row) value))))
+  hash-list)
+                  
 (defun csv-to-hash-array (filename &key field-names no-keywords)
   (map 'vector 'identity (csv-to-hash-list filename
                                            :field-names field-names
@@ -1207,3 +1231,23 @@ or like this:
 
 (defun make-keyword (name)
   (values (intern name "KEYWORD")))
+
+(defun qsort (sequence predicate &key (key 'identity))
+  "Non-destructive Quicksort.  The sequence, predicate, and key parameters are the same as in the Common Lisp sort function."
+  (when sequence
+    (let* ((pivot (first sequence))
+           (rest (rest sequence))
+           (lesser (remove-if-not 
+                    #'(lambda (x) (funcall predicate
+                                           (funcall key x)
+                                           (funcall key pivot)))
+                    rest))
+           (greater (remove-if-not 
+                     #'(lambda (x)
+                         (not (funcall predicate
+                                       (funcall key x)
+                                       (funcall key pivot))))
+                     rest)))
+      (append (qsort lesser predicate :key key)
+              (list pivot)
+              (qsort greater predicate :key key)))))
