@@ -366,13 +366,17 @@ this function returns a list of named parameters that excludes the names (and th
                        collect (elt named-params i)))
          appending (list key (getf named-params key)))))
 
-(defun list-keys (plist)
+(defun plist-keys (plist)
   "Returns the keys (properties) of the property list PLIST"
   (loop for (k v) on plist by #'cddr collect k))
 
-(defun list-values (plist)
+(defun list-keys (plist) (plist-keys plist))
+
+(defun plist-values (plist)
   "Returns the values of the property list PLIST"
   (loop for (k v) on plist by #'cddr collect v))
+
+(defun list-values (plist) (plist-values plist))
 
 (defun hash-keys (hash)
   "Returns a list of all the keys in HASH, which is a hash table."
@@ -1200,6 +1204,21 @@ or like this:
             for field in fields
             do (setf (gethash field hash) value)
             finally (return hash)))))
+
+(defun hash-list-rename-columns (hash-list &rest old-new)
+  (unless (zerop (mod (length old-new) 2))
+    (error "old-new must be an even number of parameters."))
+  (loop for row in hash-list do
+       (loop for index from 0 below (1- (length old-new)) by 2
+          for old = (elt old-new index)
+          for new = (elt old-new (1+ index))
+          for value = (gethash old row)
+          do (setf (gethash new row) value)
+            (remhash old row))))
+
+(defun plist-clean-keys (list)
+  (loop for (k v) on list by #'cddr
+     appending (list (string-to-keyword (format nil "~a" k)) v)))
 
 (defun hash-list-columns (hash-list column-names)
   "The result looks like the original hash-list, but with the specified columns only."

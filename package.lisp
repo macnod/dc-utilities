@@ -51,6 +51,7 @@
    hash-list-column
    hash-list-columns
    hash-list-from-csv
+   hash-list-rename-columns
    hash-string
    hash-to-list
    hash-to-plist
@@ -77,6 +78,9 @@
    parse-number
    partition
    path-only
+   plist-clean-keys
+   plist-keys
+   plist-values
    qsort
    range
    read-one-line
