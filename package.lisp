@@ -20,8 +20,9 @@
    csv-to-hash-array
    csv-to-hash-list
    cull-named-params
-   directory-exists
+   directory-exists-p
    distinct-elements
+   distinct-values
    document-package
    ds
    ds-clone
@@ -38,7 +39,7 @@
    fast-compress
    fast-decompress
    fib
-   file-exists
+   file-exists-p
    file-extension
    file-line-count
    filter-file

@@ -668,6 +668,9 @@ or like this:
        (return (sort (hash-keys h)
                      (lambda (a b) (< (gethash a h) (gethash b h)))))))
 
+(defun distinct-values (list)
+  (distinct-elements list))
+
 (defun range (start end &key (step 1) (filter #'identity) shuffle)
   "Returns a list of values between START and END (inclusive), skipping values by STEP, filtering remaining values with the function in FILTER, and shuffling the remaining values if SHUFFLE is true.  STEP defaults to 1, FILTER defaults to allowing all values through, and SHUFFLE default to nil."
   (let ((range (loop for a from start to end by step
@@ -838,13 +841,13 @@ or like this:
 ;; dc-store
 ;;
 
-(defun file-exists (path)
+(defun file-exists-p (path)
   "Returns a boolean value indicating if the file specified by PATH exists."
   (let ((path (probe-file path)))
     (and path
          (not (equal (file-namestring path) "")))))
 
-(defun directory-exists (path)
+(defun directory-exists-p (path)
   "Returns a boolean value indicating if the directory specified by PATH exists."
   (let ((path (probe-file path)))
     (and path
