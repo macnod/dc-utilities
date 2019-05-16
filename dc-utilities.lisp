@@ -1205,6 +1205,35 @@ or like this:
             do (setf (gethash field hash) value)
             finally (return hash)))))
 
+(defun hash-list-from-plist-list (plists)
+  (loop for plist in plists collecting
+     (loop with h = (make-hash-table :test 'equal)
+        for (key value) on plist by #'cddr
+        do (setf (gethash key h) value)
+        finally (return h))))
+
+(defun plist-list-to-csv (plists filename)
+  (hash-list-to-csv (hash-list-from-plist-list plists) filename))
+
+(defun hash-list-to-csv (hash-list filename)
+  (with-open-file (csv filename :direction :output :if-exists :supersede)
+    (let* ((headers (hash-keys (car hash-list)))
+           (escaped-headers (mapcar
+                             (lambda (h)
+                               (let* ((h1 (format nil "~(~a~)" h))
+                                      (quote (scan ",|\"|\\n" h1))
+                                      (h2 (regex-replace "\"" h1 "\"\"")))
+                                 (if quote (format nil "\"~a\"" h2) h2)))
+                             headers)))
+      (format csv "~{~a~^,~}~%" escaped-headers)
+      (loop for row in hash-list
+         for data = (loop for key in headers
+                       for value = (format nil "~a" (gethash key row))
+                       collect (if (scan "," value)
+                                   (format nil "\"~a\"" value)
+                                   value))
+         do (format csv "~{~a~^,~}~%" data)))))
+
 (defun hash-list-rename-columns (hash-list &rest old-new)
   (unless (zerop (mod (length old-new) 2))
     (error "old-new must be an even number of parameters."))

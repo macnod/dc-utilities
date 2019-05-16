@@ -10,8 +10,8 @@
   (:export
 
    *ds-timings*
-   alist-values
    alist-to-plist
+   alist-values
    bytes-to-uint
    change-per-second
    choose-from-list
@@ -22,6 +22,7 @@
    cull-named-params
    directory-exists
    distinct-elements
+   document-package
    ds
    ds-clone
    ds-from-json
@@ -32,7 +33,6 @@
    ds-set
    ds-to-json
    ds-type
-   document-package
    elapsed-time
    factorial
    fast-compress
@@ -51,14 +51,16 @@
    hash-list-column
    hash-list-columns
    hash-list-from-csv
+   hash-list-from-plist-list
    hash-list-rename-columns
+   hash-list-to-csv
    hash-string
    hash-to-list
    hash-to-plist
    hash-values
    hashify-list
-   home-settings-file
    home-based
+   home-settings-file
    index-of-max
    index-values
    interrupt-sleep
@@ -80,13 +82,14 @@
    path-only
    plist-clean-keys
    plist-keys
+   plist-list-to-csv
    plist-values
    qsort
    range
    read-one-line
    read-settings-file
-   replace-regexs
    replace-extension
+   replace-regexs
    scrape-string
    sequence-bytes-to-uint
    sequence-uint-to-bytes
@@ -100,11 +103,11 @@
    slurp-n-thaw
    spew
    split-n-trim
-   string-to-keyword
    store-delete
    store-fetch
    store-path
    store-save
+   string-to-keyword
    temp-file-name
    thaw
    thread-pool-job-queue
@@ -121,8 +124,8 @@
    to-ascii
    trim
    uint-to-bytes
-   unique-name
    unique-file-name
+   unique-name
    universal-to-unix-time
    unix-time
    unix-to-universal-time
@@ -130,4 +133,3 @@
    verify-string
    with-lines-in-file
    ))
-
