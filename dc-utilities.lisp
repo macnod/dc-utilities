@@ -1204,8 +1204,11 @@ or like this:
        collect
          (loop with hash = (make-hash-table :test 'equal)
             for value in row
+            for clean-value = (cond ((equal value "{{dcu-lisp-t}}") t)
+                                    ((equal value "{{dcu-lisp-nil}}") nil)
+                                    (t value))
             for field in fields
-            do (setf (gethash field hash) value)
+            do (setf (gethash field hash) clean-value)
             finally (return hash)))))
 
 (defun hash-list-from-plist-list (plists)
@@ -1231,7 +1234,10 @@ or like this:
       (format csv "~{~a~^,~}~%" escaped-headers)
       (loop for row in hash-list
          for data = (loop for key in headers
-                       for value = (format nil "~a" (gethash key row))
+                       for value = (let ((v (gethash key row)))
+                                     (cond ((eq v t) "{{dcu-lisp-t}}")
+                                           ((eq v nil) "{{dcu-lisp-nil}}")
+                                           (t (format nil "~a" v))))
                        collect (if (scan "," value)
                                    (format nil "\"~a\"" value)
                                    value))
