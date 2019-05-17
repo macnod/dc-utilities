@@ -53,6 +53,7 @@
    hash-list-columns
    hash-list-from-csv
    hash-list-from-plist-list
+   hash-list-index-of
    hash-list-rename-columns
    hash-list-to-csv
    hash-string
