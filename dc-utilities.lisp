@@ -1280,6 +1280,17 @@ or like this:
           do (setf (gethash key row)
                    (if (functionp value) (funcall value row) value))))
   hash-list)
+
+(defun hash-list-first-index-of (hash-list &rest key-value-pairs)
+  (loop for row in hash-list
+     for index = 0 then (1+ index)
+     when (loop for (key value) on key-value-pairs by #'cddr
+             always (equal (gethash key row) value))
+     do (return index)))
+
+(defun hash-list-first-record-of (hash-list &rest key-value-pairs)
+  (elt hash-list 
+       (apply #'hash-list-first-index-of (cons hash-list key-value-pairs))))
                   
 (defun csv-to-hash-array (filename &key field-names no-keywords)
   (map 'vector 'identity (csv-to-hash-list filename

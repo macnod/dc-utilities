@@ -48,12 +48,13 @@
    freeze-n-spew
    hash-hmac-256
    hash-keys
-   hash-list-add-column
+   hash-list-add-columns
    hash-list-column
    hash-list-columns
+   hash-list-first-index-of
+   hash-list-first-record-of
    hash-list-from-csv
    hash-list-from-plist-list
-   hash-list-index-of
    hash-list-rename-columns
    hash-list-to-csv
    hash-string
