@@ -1289,8 +1289,9 @@ or like this:
      do (return index)))
 
 (defun hash-list-first-record-of (hash-list &rest key-value-pairs)
-  (elt hash-list 
-       (apply #'hash-list-first-index-of (cons hash-list key-value-pairs))))
+  (let ((index (apply #'hash-list-first-index-of
+                      (cons hash-list key-value-pairs))))
+    (when index (elt hash-list index))))
                   
 (defun csv-to-hash-array (filename &key field-names no-keywords)
   (map 'vector 'identity (csv-to-hash-list filename
