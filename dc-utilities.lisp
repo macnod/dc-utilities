@@ -1211,12 +1211,17 @@ or like this:
             do (setf (gethash field hash) clean-value)
             finally (return hash)))))
 
-(defun hash-list-from-plist-list (plists)
+(defun hash-list-from-plists (plists)
   (loop for plist in plists collecting
      (loop with h = (make-hash-table :test 'equal)
         for (key value) on plist by #'cddr
         do (setf (gethash key h) value)
         finally (return h))))
+
+(defun hash-list-to-plists (hash-list)
+  (loop with keys = (hash-keys (car hash-list))
+     for row in hash-list
+     collect (loop for key in keys appending (list key (gethash key row)))))
 
 (defun plist-list-to-csv (plists filename)
   (hash-list-to-csv (hash-list-from-plist-list plists) filename))
@@ -1258,7 +1263,7 @@ or like this:
   (loop for (k v) on list by #'cddr
      appending (list (string-to-keyword (format nil "~a" k)) v)))
 
-(defun hash-list-columns (hash-list column-names)
+(defun hash-list-columns (hash-list &rest column-names)
   "The result looks like the original hash-list, but with the specified columns only."
   (loop for row in hash-list
      collect (loop with h = (make-hash-table :test 'equal)
@@ -1292,6 +1297,12 @@ or like this:
   (let ((index (apply #'hash-list-first-index-of
                       (cons hash-list key-value-pairs))))
     (when index (elt hash-list index))))
+
+(defun hash-list-filter (hash-list &rest key-value-pairs)
+  (loop for row in hash-list
+     when (loop for (key value) on key-value-pairs by #'cddr
+             always (equal (gethash key row) value))
+     collect row))
                   
 (defun csv-to-hash-array (filename &key field-names no-keywords)
   (map 'vector 'identity (csv-to-hash-list filename

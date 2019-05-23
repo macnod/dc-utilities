@@ -51,11 +51,13 @@
    hash-list-add-columns
    hash-list-column
    hash-list-columns
+   hash-list-filter
    hash-list-first-index-of
    hash-list-first-record-of
    hash-list-from-csv
-   hash-list-from-plist-list
+   hash-list-from-plists
    hash-list-rename-columns
+   hash-list-to-plists
    hash-list-to-csv
    hash-string
    hash-to-list
