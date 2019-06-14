@@ -17,8 +17,6 @@
    choose-from-list
    command-line-options
    create-directory
-   csv-to-hash-array
-   csv-to-hash-list
    cull-named-params
    directory-exists-p
    distinct-elements
@@ -55,10 +53,13 @@
    hash-list-first-index-of
    hash-list-first-record-of
    hash-list-from-csv
+   hash-list-from-list
    hash-list-from-plists
    hash-list-rename-columns
-   hash-list-to-plists
+   hash-list-set
    hash-list-to-csv
+   hash-list-to-plists
+   hash-list-to-table
    hash-string
    hash-to-list
    hash-to-plist
@@ -83,7 +84,8 @@
    memoize
    memoize-with-limit
    parse-number
-   partition
+   partition-by-lambdas
+   partition-by-size
    path-only
    plist-clean-keys
    plist-keys

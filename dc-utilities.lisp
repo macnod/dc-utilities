@@ -1,4 +1,4 @@
-;; Copyright © 2003-2013 Donnie Cameron
+; Copyright © 2003-2013 Donnie Cameron
 
 ;; Stuff that should be a part of Common Lisp. These routines are
 ;; general enough to be needed in most of my programs.
@@ -472,6 +472,8 @@ or like this:
 
 (defun load-settings (&rest filepaths)
   "Accepts one or more file paths, collected in FILEPATHS, and reads settings from the given files, with settings in later files overriding the same settings in earlier files.  Each settings file is a Lisp file with a dc-utilities data structure."
+  (when (null filepaths)
+    (setf filepaths (list (home-based "common-lisp/settings.lisp"))))
   (setf *settings*
         (apply #'read-settings-file filepaths))
   (replace-settings-vars *settings*))
@@ -1148,13 +1150,6 @@ or like this:
          for max = item then (if (> item max) item max)
          finally (return max-index))))
 
-(defun partition (sequence cell-size)
-  (let ((list (if (vectorp sequence)
-                  (map 'list 'identity sequence)
-                  sequence)))
-    (loop for cell on list by #'(lambda (list) (nthcdr cell-size list))
-       collecting (subseq cell 0 cell-size))))
-
 (defun string-to-keyword (string &optional (clean t))
   (let ((s (if clean
                (let* ((s1 (string-upcase
@@ -1218,6 +1213,11 @@ or like this:
         do (setf (gethash key h) value)
         finally (return h))))
 
+(defun hash-list-from-list (key list &key stringify)
+  (hash-list-from-plists
+   (mapcar (lambda (x) (list key (if stringify (format nil "~a" x) x)))
+           list)))
+
 (defun hash-list-to-plists (hash-list)
   (loop with keys = (hash-keys (car hash-list))
      for row in hash-list
@@ -1247,6 +1247,16 @@ or like this:
                                    (format nil "\"~a\"" value)
                                    value))
          do (format csv "~{~a~^,~}~%" data)))))
+
+(defun hash-list-to-table (hash-list)
+  (let ((keys (hash-keys (car hash-list))))
+    (format nil "|~{ ~a |~}~%~{~a~%~}"
+            keys
+            (loop with keys = (hash-keys (car hash-list))
+               for hash-table in hash-list
+               collect (format nil "|~{ ~a |~}" 
+                               (loop for key in keys collect
+                                    (gethash key hash-table)))))))
 
 (defun hash-list-rename-columns (hash-list &rest old-new)
   (unless (zerop (mod (length old-new) 2))
@@ -1278,13 +1288,14 @@ or like this:
 (defun hash-list-add-columns (hash-list &rest key-value-pairs)
   (unless (zerop (mod (length key-value-pairs) 2))
     (error "key-value-pairs must be an even number of parameters."))
-  (loop for row in hash-list do
-       (loop for index from 0 below (1- (length key-value-pairs)) by 2
-          for key = (elt key-value-pairs index)
-          for value = (elt key-value-pairs (1+ index))
-          do (setf (gethash key row)
-                   (if (functionp value) (funcall value row) value))))
-  hash-list)
+  (loop for hash-table in hash-list 
+     for index = 0 then (1+ index)
+     do (loop for (key value) on key-value-pairs by #'cddr
+           do (setf (gethash key hash-table)
+                    (if (functionp value)
+                        (funcall value index hash-table)
+                        value)))
+     summing 1))
 
 (defun hash-list-first-index-of (hash-list &rest key-value-pairs)
   (loop for row in hash-list
@@ -1298,17 +1309,39 @@ or like this:
                       (cons hash-list key-value-pairs))))
     (when index (elt hash-list index))))
 
-(defun hash-list-filter (hash-list &rest key-value-pairs)
-  (loop for row in hash-list
-     when (loop for (key value) on key-value-pairs by #'cddr
-             always (equal (gethash key row) value))
-     collect row))
-                  
-(defun csv-to-hash-array (filename &key field-names no-keywords)
-  (map 'vector 'identity (csv-to-hash-list filename
-                                           :field-names field-names
-                                           :no-keywords no-keywords)))
+(defun hash-list-filter (hash-list &rest filters)
+  "This function accepts a hash-list and multiple filters.  The return value consists of a list of items from the hash-list that pass all the filters.  If you want items that pass one condition or another, then you have to create a filter that implements that or operation.  Each filter must be a key/value pair or a function.  A key/value pair filter must be expressed as a list with 2 items: key and value.  A function filter can be a reference to a function or a lambda.  These must accept the zero-based index of the hash table in hash-list and the hash-table itself.  The signature of a function filter is: lambda (index hash-table).  The function filter must return true, to indicate that the hash table passes the filter, or nil otherwise."
+  (loop with functions = (remove-if-not #'functionp filters)
+     with closures = 
+       (let ((conditions (remove-if #'functionp filters)))
+         (loop for condition in conditions
+            unless (member (car condition)
+                           (hash-keys (car hash-list))
+                           :test 'equal)
+            do (error "The key ~a is not present in the given hash list."
+                      (car condition))
+            collect (lambda (index hash-table)
+                      (declare (ignore index))
+                      (equal (gethash (car condition) hash-table)
+                             (second condition)))))
+     for hash-table in hash-list
+     for index = 0 then (1+ index)
+     when (loop for function in (concatenate 'list functions closures)
+             always (funcall function index hash-table))
+     collect hash-table))
 
+(defun hash-list-set (hash-list set &rest filters)
+  "This function accepts a hash-list, a function that sets fields in each selected hash table, and one or more filters to select the hash tables that need the update.  The filters parameter works just like the filters parameter in the hash-list-filter.  The set function accepts 2 parameters: selection-index and hash-table.  The selection-index value is the index of the hash table in the selected subset of hash-list.  The hash-table value is the hash-list hash table that the function will change.  The function can change any field in the hash table, but should avoid adding or removing fields, because a hash-list works best when all the hash tables in the list have the same fields.  This function also allows you to pass a list for the set parameter instead of a function.  If you do that, then the list is a plist with key value pairs, where each key exists in every hash-list record and each corresponding value is the new value that this function will assign to that key in each of the selected hash tables."
+  (loop for hash-table in (apply #'hash-list-filter (cons hash-list filters))
+     for index = 0 then (1+ index)
+     if (functionp set) 
+     do (funcall set index hash-table)
+     else
+     do (loop for (key value) on set by #'cddr
+           do (setf (gethash key hash-table) value))
+     summing 1))
+
+                  
 (defun qsort (sequence predicate &key (key 'identity))
   "Non-destructive Quicksort.  The sequence, predicate, and key parameters are the same as in the Common Lisp sort function."
   (when sequence
@@ -1328,3 +1361,31 @@ or like this:
       (append (qsort lesser predicate :key key)
               (list pivot)
               (qsort greater predicate :key key)))))
+
+(defun partition-by-lambdas (sequence lambdas &key other exclusive)
+  (loop
+     with functions = (if (listp lambdas) lambdas (list lambdas))
+     with result = (make-list (length functions))
+     with unclassified = nil
+     with list = (if (listp sequence)
+                     sequence
+                     (map 'vector 'identity sequence))
+     for item in list
+     do (loop for lambda in functions
+           for index = 0 then (1+ index)
+           if (funcall lambda item)
+             do (push item (elt result index))
+             and when exclusive do (return) end
+           else
+             when other do (push item unclassified))
+     finally
+       (return (mapcar (lambda (r) (reverse r)) 
+                       (append result (list unclassified))))))
+ 
+(defun partition-by-size (sequence cell-size)
+  (let ((list (if (vectorp sequence)
+                  (map 'list 'identity sequence)
+                  sequence)))
+    (loop for cell on list by #'(lambda (list) (nthcdr cell-size list))
+       collecting (subseq cell 0 cell-size))))
+
