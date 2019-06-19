@@ -1297,6 +1297,11 @@ or like this:
                         value)))
      summing 1))
 
+(defun hash-list-remove-columns (hash-list &rest columns)
+  (loop for hash in hash-list
+     do (loop for column in columns
+           do (remhash column hash))))
+
 (defun hash-list-first-index-of (hash-list &rest key-value-pairs)
   (loop for row in hash-list
      for index = 0 then (1+ index)
@@ -1341,6 +1346,17 @@ or like this:
            do (setf (gethash key hash-table) value))
      summing 1))
 
+(defun hash-list-keys (hash-list)
+  "This function returns a list of the keys that are present in every element of the list"
+  (loop with counts = (make-hash-table :test 'equal)
+     for hash in hash-list
+     do (loop for key being the hash-keys in hash
+           do (incf (gethash key counts 0)))
+     finally
+       (return
+         (loop with l = (length hash-list)
+            for key being the hash-keys in counts using (hash-value val)
+            when (= val l) collect key))))
                   
 (defun qsort (sequence predicate &key (key 'identity))
   "Non-destructive Quicksort.  The sequence, predicate, and key parameters are the same as in the Common Lisp sort function."
@@ -1389,3 +1405,18 @@ or like this:
     (loop for cell on list by #'(lambda (list) (nthcdr cell-size list))
        collecting (subseq cell 0 cell-size))))
 
+(defun sort-keywords (keywords &key descending)
+  (sort keywords 
+        (if descending #'string> #'string<)
+        :key (lambda (x) (format nil "~a" x))))
+
+(defun subtract-lists (list-1 list-2 &key (key (lambda (x) x)))
+  (loop with h = (hashify-list list-1 :f-key key)
+     for x in list-2
+     for xkey = (funcall key x)
+     when (gethash xkey h)
+     do (decf (gethash xkey h))
+     finally
+       (return
+         (loop for k being the hash-keys in h using (hash-value v)
+            when (> v 0) collect k))))

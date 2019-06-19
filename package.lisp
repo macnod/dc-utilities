@@ -55,6 +55,7 @@
    hash-list-from-csv
    hash-list-from-list
    hash-list-from-plists
+   hash-list-keys
    hash-list-rename-columns
    hash-list-set
    hash-list-to-csv
@@ -108,6 +109,7 @@
    slurp
    slurp-binary
    slurp-n-thaw
+   sort-keywords
    spew
    split-n-trim
    store-delete
@@ -115,6 +117,7 @@
    store-path
    store-save
    string-to-keyword
+   subtract-lists
    temp-file-name
    thaw
    thread-pool-job-queue
