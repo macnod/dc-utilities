@@ -1086,11 +1086,13 @@ or like this:
 (defun hashify-list (list
                      &key (method :count)
                        (f-key (lambda (x) x))
+                       hash-key
+                       plist-key
                        (f-value (lambda (key-raw key-clean value)
                                   (declare (ignore key-raw key-clean))
                                   value))
                        (initial-value 0))
-  "Takes a list and returns a hash table, using the specified method. Supported methods, specified via the :method key, are :count, :plist, :alist, and :custom.  With the :count method, which the function uses by default if no method is specified, the function to creates a hash table in which the keys are the distinct items of the list and the value for each key is the count of that distinct element in the list.  The :alist method assumes that the list contains key/value pairs and looks like this: '((key1 . value1) (key2 . value2) (key3 . value3)...).  The :plist method works just like the :alist method, but expects a list that looks like this: '(key1 value1 key2 value2 key3 value3 ...).  The :custom method requires that you provide functions for computing the key from the element in the list and for computing the value given the element, the computed key, and the existing hash value currently associated with the computed key.  If there's no hash value associated with the computed key, then the value specified via :initial-value is used. The :count, :pairs, and :merged-pairs methods allow you to specify functions for computing the key (given the element) and the value (given the element, the computed key, and the existing value)."
+  "Takes a list and returns a hash table, using the specified method. Supported methods, specified via the :method key, are :count, :plist, :alist, :index, and :custom.  With the :count method, which the function uses by default if no method is specified, the function to creates a hash table in which the keys are the distinct items of the list and the value for each key is the count of that distinct element in the list.  The :alist and :plist methods do the same thing, but with alists and plists.  The :alist method assumes that the list contains key/value pairs and looks like this: '((key1 . value1) (key2 . value2) (key3 . value3)...).  The :plist method works just like the :alist method, but expects a list that looks like this: '(key1 value1 key2 value2 key3 value3 ...).  The :index method tells this function that you to specify the key with one of the f-key, hash-key, and plist-key parameters, and that the value should be the list value.  If the objects in the list that you're indexing are hash tables, then you can specify the index key with hash-key.  If the objects are plists, then you can specify the index with plist-key.  hash-key and plist-key are just shortcuts to save you from having to write some code for f-key.  This allows you to later look up an element in the list, by the given key, in O(1) time.  The :custom method requires that you provide functions for computing the key from the element in the list and for computing the value given the element, the computed key, and the existing hash value currently associated with the computed key.  If there's no hash value associated with the computed key, then the value specified via :initial-value is used. The :count, :pairs, and :merged-pairs methods allow you to specify functions for computing the key (given the element) and the value (given the element, the computed key, and the existing value)."
   (let ((h (make-hash-table :test 'equal)))
     (case method
       (:count (loop for k-raw in list
@@ -1101,14 +1103,21 @@ or like this:
                   for value-old = (gethash k-clean h initial-value)
                   for value-new = (funcall f-value k-raw k-clean value-old)
                   do (setf (gethash k-clean h) value-new)))
-      (:plist (loop for (k-raw value) in (find-pairs list)
+      (:plist (loop for (k-raw value) on list by #'cddr
                  for k-clean = (funcall f-key k-raw)
                  for value-new = (funcall f-value k-raw k-clean value)
                  do (setf (gethash k-clean h) value-new)))
       (:alist (loop for (k-raw value) in list
                  for k-clean = (funcall f-key k-raw)
                  for value-new = (funcall f-value k-raw k-clean value)
-                 do (setf (gethash k-clean h) value-new))))
+                 do (setf (gethash k-clean h) value-new)))
+      (:index (loop with key-function = 
+                   (cond (hash-key (lambda (x) (gethash hash-key x)))
+                         (plist-key (lambda (x) (getf x plist-key)))
+                         (f-key f-key))
+                 for value in list
+                 for key = (funcall key-function value)
+                 do (setf (gethash key h) value))))
     h))
 
 (defun hash-to-list (hash)
