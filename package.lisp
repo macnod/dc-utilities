@@ -56,6 +56,7 @@
    hash-list-from-list
    hash-list-from-plists
    hash-list-keys
+   hash-list-remove-columns
    hash-list-rename-columns
    hash-list-set
    hash-list-to-csv
