@@ -26,6 +26,7 @@
 (defparameter *dc-thread-pool-collector-mutex* nil)
 (defparameter *dc-timings* (make-hash-table :test #'equal :synchronized t))
 (defvar *unix-epoch-difference* (encode-universal-time 0 0 0 1 1 1970 0))
+(defparameter *dc-aws-credentials* nil)
 
 (defun universal-to-unix-time (universal-time)
   (- universal-time *unix-epoch-difference*))
@@ -1429,3 +1430,31 @@ or like this:
        (return
          (loop for k being the hash-keys in h using (hash-value v)
             when (> v 0) collect k))))
+
+(defun aws-load-settings (&key (filename (home-based ".aws/credentials")))
+  (when (not (file-exists-p filename))
+    (error "File not found: ~s" filename))
+  (with-open-file (file filename)
+    (loop 
+       with settings = (ds '(:map))
+       and profile-key
+       for line = (read-line file nil)
+       for clean-line = (trim line)
+       while clean-line
+       do (if (scan "^\\[" clean-line)
+              (setf profile-key 
+                    (multiple-value-bind (a b)
+                        (scan-to-strings "\\[([^\\]]+)\\]" clean-line)
+                      (declare (ignore a))
+                      (string-to-keyword (elt b 0))))
+              (when (not (zerop (length clean-line)))
+                (let* ((key-value (split-n-trim clean-line
+                                                :on-regex "\\s*=\\s*"))
+                       (key (string-to-keyword (car key-value)))
+                       (value (second key-value)))
+                  (ds-set settings (list profile-key key) value))))
+       finally (return (setf *dc-aws-credentials* settings)))))
+
+(defun aws-setting (key &optional (profile :default))
+  (ds-get *dc-aws-credentials* profile key))
+

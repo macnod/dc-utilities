@@ -12,6 +12,8 @@
    *ds-timings*
    alist-to-plist
    alist-values
+   aws-load-settings
+   aws-setting
    bytes-to-uint
    change-per-second
    choose-from-list
