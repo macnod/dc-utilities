@@ -26,7 +26,14 @@
 (defparameter *dc-thread-pool-collector-mutex* nil)
 (defparameter *dc-timings* (make-hash-table :test #'equal :synchronized t))
 (defvar *unix-epoch-difference* (encode-universal-time 0 0 0 1 1 1970 0))
-(defparameter *dc-aws-credentials* nil)
+(defparameter *dc-aws-settings* nil)
+(defparameter *dc-progress-hash* (make-hash-table :test 'equal))
+(defparameter *tz-names* (make-hash-table :test 'equal))
+(defparameter *tz-names-plist*
+  '("UTC" 0 "GMT" 0 "PST" -8 "IST" 5.5 "EST" -5 "CST" -6))
+
+(loop for (tz offset) on *tz-names-plist* by #'cddr
+     do (setf (gethash tz *tz-names*) offset))
 
 (defun universal-to-unix-time (universal-time)
   (- universal-time *unix-epoch-difference*))
@@ -36,6 +43,31 @@
 
 (defun unix-time ()
   (universal-to-unix-time (get-universal-time)))
+
+(defun month-string-to-int (month)
+  (1+ (position (string-downcase (subseq month 0 3))
+                (list "jan" "feb" "mar" "apr" "may" "jun" "jul"
+                      "aug" "sep" "oct" "nov" "dec")
+                :test 'equal)))
+
+(defun time-zone-to-int (time-zone)
+  (gethash (string-downcase time-zone) *tz-names*))
+
+(defun parse-date-1 (string)
+  "Parses a date of the format Sat, 29 Jun 2019 00:00:00 GMT.  Returns a universal-time integer."
+  (let ((parts (split "[, :]+" string)))
+    (when (= (length parts) 8)
+      (destructuring-bind (wday mday month year hour minute second time-zone)
+          parts
+        (declare (ignore wday))
+        (encode-universal-time
+         (parse-integer second)
+         (parse-integer minute)
+         (parse-integer hour)
+         (parse-integer mday)
+         (month-string-to-int month)
+         (parse-integer year)
+         (time-zone-to-int time-zone))))))
 
 (defun to-ascii (s)
   "Converts the string S, which may contain non-ascii characters, into a string with nothing but ascii characters.  Non ascii characters are converted into spaces.  If S is a list, this function converts each element of the list into an all-ascii string."
@@ -49,10 +81,11 @@
 (defun timestamp (&key
                     (time (get-universal-time))
                     string
+                    time-zone
                     (format "Y-M-DTh:m:s"))
   "Returns the given time (or the current time) formatted according to the FORMAT parameter, followed by an optional value for STRING.  If STRING is provided, the function adds a space to the result and then appends the string to that.  The FORMAT string can contain any characters.  This function will replace the format characters Y, M, D, h, m, and s, respectively, with numbers representing the year,month, day, hour, minute, and second.  All the numbers are 2 digits long, except for the year, which is 4 digits long."
   (multiple-value-bind (second minute hour day month year)
-      (decode-universal-time time)
+      (decode-universal-time time time-zone)
     (let* ((space-string (if string (format nil " ~a" string) ""))
            (parts (ds (list :map
                             "Y" (format nil "~d"     year)
@@ -120,9 +153,9 @@ g entry to the given stream."
     (with-output-to-string (output-stream)
       (with-output-to-string (error-stream)
         (with-input-from-string (input-stream input-pipe-data)
-          (sb-ext:run-program program parameters 
+          (sb-ext:run-program program parameters
                               :search t
-                              :output output-stream 
+                              :output output-stream
                               :error error-stream
                               :input input-stream))))))
 
@@ -157,7 +190,7 @@ g entry to the given stream."
 
 (defun create-directory (dir &key with-parents)
   "Works just like the mkdir shell command.  DIR is the directory you want to create. Use WITH-PARENTS if you want the function to create parent directories as necessary."
-  (unless (directory-exists dir)
+  (unless (directory-exists-p dir)
     (when
         (zerop
          (length
@@ -482,10 +515,10 @@ or like this:
 (defun replace-settings-vars (settings)
   (loop for k being the hash-keys in settings
      using (hash-value v)
-     when (and (hash-table-p v) 
+     when (and (hash-table-p v)
                (not (equal k :vars)))
      do (replace-settings-vars v)
-     when (stringp v) 
+     when (stringp v)
      do (ds-set settings k (replace-regexs v (hash-to-list (setting :vars))))))
 
 (defun setting (&rest keys)
@@ -665,7 +698,7 @@ or like this:
   "Accepts a list of elements LIST and returns a new list with distinct elements from the first list.  The function Copies the original list, removes duplicate elements from the copy, and returns the copy, all while preserving the order of the original list."
   (loop with h = (make-hash-table :test 'equal)
      for v = 0 then (1+ v)
-     for k in list 
+     for k in list
      when (not (gethash k h)) do (setf (gethash k h) v)
      finally
        (return (sort (hash-keys h)
@@ -746,7 +779,7 @@ or like this:
                  (progn (setf (getf *dc-job-queue* pool-name)
                               (copy-list job-queue))
                         (lambda ()
-                          (let ((job (with-mutex 
+                          (let ((job (with-mutex
                                          ((getf *dc-job-queue-mutex* pool-name))
                                        (pop (getf *dc-job-queue* pool-name)))))
                             (when job
@@ -796,11 +829,11 @@ or like this:
 
         (getf *dc-thread-pool-done* pool-name) nil))
 
-(defun job-thread (fn-get-next-job 
-                   fn-job 
-                   pool-name 
-                   fn-collect 
-                   fn-mark-done 
+(defun job-thread (fn-get-next-job
+                   fn-job
+                   pool-name
+                   fn-collect
+                   fn-mark-done
                    fn-check-done)
   (lambda ()
     (loop for job = (funcall fn-get-next-job)
@@ -901,7 +934,7 @@ or like this:
   "Reads the content of the file specified by ROOT and KEY, and deserializes that content into an object.  See the store-save and and store-path functions for information about how ROOT and KEY are treated."
   (let* ((path (store-path root key))
          (abs-filename (join-paths path key)))
-    (when (file-exists abs-filename)
+    (when (file-exists-p abs-filename)
       (slurp-n-thaw abs-filename))))
 
 (defun store-delete (root key)
@@ -1112,7 +1145,7 @@ or like this:
                  for k-clean = (funcall f-key k-raw)
                  for value-new = (funcall f-value k-raw k-clean value)
                  do (setf (gethash k-clean h) value-new)))
-      (:index (loop with key-function = 
+      (:index (loop with key-function =
                    (cond (hash-key (lambda (x) (gethash hash-key x)))
                          (plist-key (lambda (x) (getf x plist-key)))
                          (f-key f-key))
@@ -1136,7 +1169,7 @@ or like this:
       (let ((k (pop list))
             (v (pop list)))
         (cons (list k v) (find-pairs list)))))
-              
+
 (defun choose-from-list (list n)
   (loop with h = (make-hash-table :test 'equal)
      and l = (length list)
@@ -1173,7 +1206,7 @@ or like this:
 
 (defun alist-to-plist (alist &optional remove-star-prefix)
   (loop for (key . value) in alist
-     appending (list 
+     appending (list
                 (if (and remove-star-prefix
                          (scan "^\\*.+" (format nil "~a" key)))
                     (string-to-keyword
@@ -1185,7 +1218,7 @@ or like this:
 
 (defun hash-list-from-csv (filename &key headers-in-file header-list
                                     (clean-headers t))
-  (let* ((rows (cl-csv:read-csv 
+  (let* ((rows (cl-csv:read-csv
                 (if (pathnamep filename) filename (pathname filename))))
          (fields (cond
                    (header-list
@@ -1199,10 +1232,10 @@ or like this:
                   (length fields)))
       (setf fields
             (let ((hash (hashify-list fields)))
-              (loop for field being the hash-keys in hash 
-                 using (hash-value count) appending 
+              (loop for field being the hash-keys in hash
+                 using (hash-value count) appending
                    (if (= count 1)
-                       field 
+                       field
                        (loop for a from 1 to count
                           collect (format nil "~a-~a" field a)))))))
     (loop for row in (if headers-in-file (cdr rows) rows)
@@ -1234,7 +1267,7 @@ or like this:
      collect (loop for key in keys appending (list key (gethash key row)))))
 
 (defun plist-list-to-csv (plists filename)
-  (hash-list-to-csv (hash-list-from-plist-list plists) filename))
+  (hash-list-to-csv (hash-list-from-plists plists) filename))
 
 (defun hash-list-to-csv (hash-list filename)
   (with-open-file (csv filename :direction :output :if-exists :supersede)
@@ -1264,7 +1297,7 @@ or like this:
             keys
             (loop with keys = (hash-keys (car hash-list))
                for hash-table in hash-list
-               collect (format nil "|~{ ~a |~}" 
+               collect (format nil "|~{ ~a |~}"
                                (loop for key in keys collect
                                     (gethash key hash-table)))))))
 
@@ -1298,7 +1331,7 @@ or like this:
 (defun hash-list-add-columns (hash-list &rest key-value-pairs)
   (unless (zerop (mod (length key-value-pairs) 2))
     (error "key-value-pairs must be an even number of parameters."))
-  (loop for hash-table in hash-list 
+  (loop for hash-table in hash-list
      for index = 0 then (1+ index)
      do (loop for (key value) on key-value-pairs by #'cddr
            do (setf (gethash key hash-table)
@@ -1327,7 +1360,7 @@ or like this:
 (defun hash-list-filter (hash-list &rest filters)
   "This function accepts a hash-list and multiple filters.  The return value consists of a list of items from the hash-list that pass all the filters.  If you want items that pass one condition or another, then you have to create a filter that implements that or operation.  Each filter must be a key/value pair or a function.  A key/value pair filter must be expressed as a list with 2 items: key and value.  A function filter can be a reference to a function or a lambda.  These must accept the zero-based index of the hash table in hash-list and the hash-table itself.  The signature of a function filter is: lambda (index hash-table).  The function filter must return true, to indicate that the hash table passes the filter, or nil otherwise."
   (loop with functions = (remove-if-not #'functionp filters)
-     with closures = 
+     with closures =
        (let ((conditions (remove-if #'functionp filters)))
          (loop for condition in conditions
             unless (member (car condition)
@@ -1349,7 +1382,7 @@ or like this:
   "This function accepts a hash-list, a function that sets fields in each selected hash table, and one or more filters to select the hash tables that need the update.  The filters parameter works just like the filters parameter in the hash-list-filter.  The set function accepts 2 parameters: selection-index and hash-table.  The selection-index value is the index of the hash table in the selected subset of hash-list.  The hash-table value is the hash-list hash table that the function will change.  The function can change any field in the hash table, but should avoid adding or removing fields, because a hash-list works best when all the hash tables in the list have the same fields.  This function also allows you to pass a list for the set parameter instead of a function.  If you do that, then the list is a plist with key value pairs, where each key exists in every hash-list record and each corresponding value is the new value that this function will assign to that key in each of the selected hash tables."
   (loop for hash-table in (apply #'hash-list-filter (cons hash-list filters))
      for index = 0 then (1+ index)
-     if (functionp set) 
+     if (functionp set)
      do (funcall set index hash-table)
      else
      do (loop for (key value) on set by #'cddr
@@ -1367,18 +1400,18 @@ or like this:
          (loop with l = (length hash-list)
             for key being the hash-keys in counts using (hash-value val)
             when (= val l) collect key))))
-                  
+
 (defun qsort (sequence predicate &key (key 'identity))
   "Non-destructive Quicksort.  The sequence, predicate, and key parameters are the same as in the Common Lisp sort function."
   (when sequence
     (let* ((pivot (first sequence))
            (rest (rest sequence))
-           (lesser (remove-if-not 
+           (lesser (remove-if-not
                     #'(lambda (x) (funcall predicate
                                            (funcall key x)
                                            (funcall key pivot)))
                     rest))
-           (greater (remove-if-not 
+           (greater (remove-if-not
                      #'(lambda (x)
                          (not (funcall predicate
                                        (funcall key x)
@@ -1405,9 +1438,9 @@ or like this:
            else
              when other do (push item unclassified))
      finally
-       (return (mapcar (lambda (r) (reverse r)) 
+       (return (mapcar (lambda (r) (reverse r))
                        (append result (list unclassified))))))
- 
+
 (defun partition-by-size (sequence cell-size)
   (let ((list (if (vectorp sequence)
                   (map 'list 'identity sequence)
@@ -1416,7 +1449,7 @@ or like this:
        collecting (subseq cell 0 cell-size))))
 
 (defun sort-keywords (keywords &key descending)
-  (sort keywords 
+  (sort keywords
         (if descending #'string> #'string<)
         :key (lambda (x) (format nil "~a" x))))
 
@@ -1435,14 +1468,14 @@ or like this:
   (when (not (file-exists-p filename))
     (error "File not found: ~s" filename))
   (with-open-file (file filename)
-    (loop 
+    (loop
        with settings = (ds '(:map))
        and profile-key
        for line = (read-line file nil)
        for clean-line = (trim line)
        while clean-line
        do (if (scan "^\\[" clean-line)
-              (setf profile-key 
+              (setf profile-key
                     (multiple-value-bind (a b)
                         (scan-to-strings "\\[([^\\]]+)\\]" clean-line)
                       (declare (ignore a))
@@ -1453,8 +1486,29 @@ or like this:
                        (key (string-to-keyword (car key-value)))
                        (value (second key-value)))
                   (ds-set settings (list profile-key key) value))))
-       finally (return (setf *dc-aws-credentials* settings)))))
+       finally (return (setf *dc-aws-settings* settings)))))
 
 (defun aws-setting (key &optional (profile :default))
-  (ds-get *dc-aws-credentials* profile key))
+  (ds-get *dc-aws-settings* profile key))
 
+(defun initialize-progress-report (name max-count)
+  (setf (gethash name *dc-progress-hash*)
+        (list :max-count max-count :start-time (get-universal-time))))
+
+(defun report-progress (name count &key (stream t))
+  (let* ((initial (gethash name *dc-progress-hash*))
+         (max (getf initial :max-count))
+         (start (getf initial :start-time))
+         (percent-done (* (/ (float count) max) 100))
+         (et (- (get-universal-time) start))
+         (tt (* (/ et count) max))
+         (rt (max (- tt et) 0))
+         (eta (+ start tt)))
+    (format stream "~a ~a/~a (~,2f%) et=~,2fh rt=~,2fh eta=~a~%"
+            (timestamp)
+            count
+            max
+            percent-done
+            (/ (float et) 3600)
+            (/ (float rt) 3600)
+            (timestamp :time (truncate eta) :format "h:m:s"))))

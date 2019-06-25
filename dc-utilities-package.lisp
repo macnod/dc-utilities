@@ -73,6 +73,7 @@
    home-settings-file
    index-of-max
    index-values
+   initialize-progress-report
    interrupt-sleep
    interruptible-sleep
    join-paths
@@ -87,6 +88,8 @@
    mark-time
    memoize
    memoize-with-limit
+   month-string-to-int
+   parse-date-1
    parse-number
    partition-by-lambdas
    partition-by-size
@@ -101,6 +104,7 @@
    read-settings-file
    replace-extension
    replace-regexs
+   report-progress
    scrape-string
    sequence-bytes-to-uint
    sequence-uint-to-bytes
@@ -133,6 +137,7 @@
    thread-pool-stop-time
    thread-pool-time-to-go
    time-to-go
+   time-zone-to-int
    timestamp
    to-ascii
    trim
