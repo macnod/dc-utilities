@@ -1130,7 +1130,11 @@ or like this:
   (let ((h (make-hash-table :test 'equal)))
     (case method
       (:count (loop for k-raw in list
-                 for k-clean = (funcall f-key k-raw)
+                 for key-function =
+                   (cond (hash-key (lambda (x) (gethash hash-key x)))
+                         (plist-key (lambda (x) (getf x plist-key)))
+                         (f-key f-key))
+                 for k-clean = (funcall key-function k-raw)
                  do (incf (gethash k-clean h 0))))
       (:custom (loop for k-raw in list
                   for k-clean = (funcall f-key k-raw)
@@ -1361,21 +1365,22 @@ or like this:
   "This function accepts a hash-list and multiple filters.  The return value consists of a list of items from the hash-list that pass all the filters.  If you want items that pass one condition or another, then you have to create a filter that implements that or operation.  Each filter must be a key/value pair or a function.  A key/value pair filter must be expressed as a list with 2 items: key and value.  A function filter can be a reference to a function or a lambda.  These must accept the zero-based index of the hash table in hash-list and the hash-table itself.  The signature of a function filter is: lambda (index hash-table).  The function filter must return true, to indicate that the hash table passes the filter, or nil otherwise."
   (loop with functions = (remove-if-not #'functionp filters)
      with closures =
-       (let ((conditions (remove-if #'functionp filters)))
-         (loop for condition in conditions
-            unless (member (car condition)
+       (loop for condition in (remove-if #'functionp filters)
+          unless (member (car condition)
                            (hash-keys (car hash-list))
                            :test 'equal)
             do (error "The key ~a is not present in the given hash list."
                       (car condition))
-            collect (lambda (index hash-table)
-                      (declare (ignore index))
-                      (equal (gethash (car condition) hash-table)
-                             (second condition)))))
+          collect (let ((key (car condition))
+                        (value (second condition)))
+                    (lambda (i x)
+                      (declare (ignore i))
+                      (equal (gethash key x) value))))
+     with conditions = (concatenate 'list functions closures)
      for hash-table in hash-list
      for index = 0 then (1+ index)
-     when (loop for function in (concatenate 'list functions closures)
-             always (funcall function index hash-table))
+     when (loop for c in conditions
+             always (funcall c index hash-table))
      collect hash-table))
 
 (defun hash-list-set (hash-list set &rest filters)
