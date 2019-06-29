@@ -694,15 +694,33 @@ or like this:
      do (setf (gethash key hash) value)
      finally (return hash)))
 
-(defun distinct-elements (list)
-  "Accepts a list of elements LIST and returns a new list with distinct elements from the first list.  The function Copies the original list, removes duplicate elements from the copy, and returns the copy, all while preserving the order of the original list."
-  (loop with h = (make-hash-table :test 'equal)
-     for v = 0 then (1+ v)
-     for k in list
-     when (not (gethash k h)) do (setf (gethash k h) v)
-     finally
-       (return (sort (hash-keys h)
-                     (lambda (a b) (< (gethash a h) (gethash b h)))))))
+;; (defun distinct-elements (list)
+;;   "Accepts a list of elements LIST and returns a new list with distinct elements from the first list.  The function Copies the original list, removes duplicate elements from the copy, and returns the copy, all while preserving the order of the original list."
+;;   (loop with h = (make-hash-table :test 'equal)
+;;      for v = 0 then (1+ v)
+;;      for k in list
+;;      when (not (gethash k h)) do (setf (gethash k h) v)
+;;      finally
+;;        (return (sort (hash-keys h)
+;;                      (lambda (a b) (< (gethash a h) (gethash b h)))))))
+
+(defun distinct-elements (sequence &key (key (lambda (x) x)))
+  "Accespts a sequence of elements (list or vector) and returns a new sequence of the same type with distinct elements from the original sequence.  If the elements in the sequence are hash tables, plists, or objects with methods, then you can provide a value or function for the :key parameter.  If you provide a value, the function will use the value as the key of the element, and the value of the key will represent the unique signature of the element.  If you provide a function, then the function will be applied to the element to compute the elements unique signature."
+  (let* ((list (if (vectorp sequence)
+                   (map 'list 'identity sequence)
+                   sequence))
+         (f-key (if (functionp key)
+                    key
+                    (cond ((hash-table-p (car list))
+                           (lambda (x) (gethash key x)))
+                          ((listp (car list))
+                           (lambda (x) (getf x key)))
+                          (t (lambda (x) (funcall key x))))))
+         (distinct (hash-values
+                    (hashify-list list :method :index :f-key f-key))))
+    (if (vectorp sequence)
+        (map 'vector 'identity distinct)
+        distinct)))
 
 (defun distinct-values (list)
   (distinct-elements list))
@@ -1182,7 +1200,7 @@ or like this:
                 while (gethash c h)
                 finally (setf (gethash c h) t)
                   (return c))
-     collect b))
+     collect (elt list b)))
 
 (defun index-of-max (list)
   (if (arrayp list)
@@ -1220,8 +1238,14 @@ or like this:
                     (alist-to-plist value)
                     value))))
 
+(defun parse-if-number (value)
+  (if (scan "^(?=.)([+-]?([0-9]*)(\.([0-9]+))?)$" value)
+      (parse-number value)
+      value))
+
 (defun hash-list-from-csv (filename &key headers-in-file header-list
-                                    (clean-headers t))
+                                      (clean-headers t)
+                                      (parse-numbers t))
   (let* ((rows (cl-csv:read-csv
                 (if (pathnamep filename) filename (pathname filename))))
          (fields (cond
@@ -1248,6 +1272,7 @@ or like this:
             for value in row
             for clean-value = (cond ((equal value "{{dcu-lisp-t}}") t)
                                     ((equal value "{{dcu-lisp-nil}}") nil)
+                                    (parse-numbers (parse-if-number value))
                                     (t value))
             for field in fields
             do (setf (gethash field hash) clean-value)
@@ -1346,8 +1371,10 @@ or like this:
 
 (defun hash-list-remove-columns (hash-list &rest columns)
   (loop for hash in hash-list
-     do (loop for column in columns
-           do (remhash column hash))))
+     when (loop for column in columns
+             thereis (remhash column hash))
+     summing 1))
+
 
 (defun hash-list-first-index-of (hash-list &rest key-value-pairs)
   (loop for row in hash-list
@@ -1395,7 +1422,7 @@ or like this:
      summing 1))
 
 (defun hash-list-keys (hash-list)
-  "This function returns a list of the keys that are present in every element of the list"
+  "This function returns a list of the keys that are present in every element of the list."
   (loop with counts = (make-hash-table :test 'equal)
      for hash in hash-list
      do (loop for key being the hash-keys in hash
@@ -1406,6 +1433,23 @@ or like this:
             for key being the hash-keys in counts using (hash-value val)
             when (= val l) collect key))))
 
+(defun hash-list-stray-keys (hash-list)
+  "This function returns a list of keys that appear in some but not all of the elements in the hash-list."
+  (loop with target-count = (length hash-list)
+     and counts = (make-hash-table :test 'equal)
+     for hash in hash-list
+     do (loop for k being the hash-keys in hash
+           do (incf (gethash k counts 0)))
+     finally 
+       (return 
+         (list :list-size target-count
+               :stray-keys 
+               (loop for k being the hash-keys in counts 
+                  using (hash-value v)
+                  when (not (= (gethash k counts) target-count))
+                  collect (list :key k 
+                                :records (gethash k counts)))))))
+  
 (defun qsort (sequence predicate &key (key 'identity))
   "Non-destructive Quicksort.  The sequence, predicate, and key parameters are the same as in the Common Lisp sort function."
   (when sequence
@@ -1517,3 +1561,4 @@ or like this:
             (/ (float et) 3600)
             (/ (float rt) 3600)
             (timestamp :time (truncate eta) :format "h:m:s"))))
+
