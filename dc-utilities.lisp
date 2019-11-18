@@ -377,6 +377,12 @@ g entry to the given stream."
     ((= x 1) 1)
     (t (+ (fib (1- x)) (fib (- x 2))))))
 
+(defun primep (x)
+  (cond ((< x 2) nil)
+        ((= x 2) t)
+        ((zerop (mod x 2)) nil)
+        (t (loop for a from 3 to (sqrt x) by 2 never (zerop (mod x a))))))
+
 (defun alist-values (alist &rest keys)
   "Returns the values associated with KEYS in ALIST.  ALIST is an associative list."
   (loop for key in keys collect (cdr (assoc key alist))))
@@ -1172,8 +1178,10 @@ or like this:
                          (plist-key (lambda (x) (getf x plist-key)))
                          (f-key f-key))
                  for value in list
-                 for key = (funcall key-function value)
-                 do (setf (gethash key h) value))))
+                 for k-raw = (funcall key-function value)
+                 for k-clean = k-raw
+                 for value-new = (funcall f-value k-raw k-clean value)
+                 do (setf (gethash k-clean h) value-new))))
     h))
 
 (defun hash-to-list (hash)
@@ -1322,7 +1330,7 @@ or like this:
 
 (defun hash-list-to-table (hash-list)
   (let ((keys (hash-keys (car hash-list))))
-    (format nil "|~{ ~a |~}~%~{~a~%~}"
+    (format nil "|~{ ~a |~}~%|---~%~{~a~%~}"
             keys
             (loop with keys = (hash-keys (car hash-list))
                for hash-table in hash-list
@@ -1548,7 +1556,7 @@ or like this:
   (let* ((initial (gethash name *dc-progress-hash*))
          (max (getf initial :max-count))
          (start (getf initial :start-time))
-         (percent-done (* (/ (float count) max) 100))
+         (percent-done (* q(/ (float count) max) 100))
          (et (- (get-universal-time) start))
          (tt (* (/ et count) max))
          (rt (max (- tt et) 0))
@@ -1562,3 +1570,12 @@ or like this:
             (/ (float rt) 3600)
             (timestamp :time (truncate eta) :format "h:m:s"))))
 
+(defmacro chart (&body chart-spec)
+  (let* ((filename (unique-file-name)))
+    `(progn (with-gchart 
+                ,@chart-spec
+              (add-features :transparent-background :label)
+              (save-file ,filename))
+            (swank:eval-in-emacs
+             `(slime-media-insert-image (create-image ,,filename) ,,filename))
+            (delete-file ,filename))))

@@ -1,14 +1,14 @@
 ;;;; package.lisp
 
 (defpackage :dc-utilities
-  (:use :cl :cl-ppcre :trivial-utf-8 :sb-thread :sb-ext :cl-csv)
+  (:use :cl :cl-ppcre :trivial-utf-8 :sb-thread :sb-ext :cl-csv
+        :vecto :adw-charting)
   (:import-from :ironclad
                 :ascii-string-to-byte-array
                 :byte-array-to-hex-string
                 :digest-sequence
                 :sha512)
   (:export
-
    *ds-timings*
    alist-to-plist
    alist-values
