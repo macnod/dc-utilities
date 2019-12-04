@@ -1556,7 +1556,7 @@ or like this:
   (let* ((initial (gethash name *dc-progress-hash*))
          (max (getf initial :max-count))
          (start (getf initial :start-time))
-         (percent-done (* q(/ (float count) max) 100))
+         (percent-done (* (/ (float count) max) 100))
          (et (- (get-universal-time) start))
          (tt (* (/ et count) max))
          (rt (max (- tt et) 0))
