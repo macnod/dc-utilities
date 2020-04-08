@@ -1298,6 +1298,28 @@ or like this:
    (mapcar (lambda (x) (list key (if stringify (format nil "~a" x) x)))
            list)))
 
+(defun hash-list-from-json-objects (json)
+  (let* ((hash-list (loop
+                       for line in (split "\\n" (trim json))
+                       while (and line (not (equal (trim line) "")))
+                       for record = (ds-from-json (trim line))
+                       collect record))
+         (old-keys (hash-list-keys hash-list))
+         (new-keys (mapcar (lambda (k) (string-to-keyword k)) old-keys)))
+    (apply #'hash-list-rename-columns 
+           (cons hash-list (loop for a in old-keys 
+                              for b in new-keys
+                              appending (list a b))))
+    hash-list))
+
+
+(defun hash-list-from-json-objects-file (file)
+  (with-open-file (s file)
+    (loop for line = (read-line s nil)
+       while line collect line into lines
+       finally (return (hash-list-from-json-objects 
+                        (format nil "~{~a~^~%~}" lines))))))
+
 (defun hash-list-to-plists (hash-list)
   (loop with keys = (hash-keys (car hash-list))
      for row in hash-list
@@ -1338,6 +1360,26 @@ or like this:
                                (loop for key in keys collect
                                     (gethash key hash-table)))))))
 
+(defun hash-list-to-json (hash-list)
+  (format nil "[~{~a~^,~}]"
+          (loop for row in hash-list collect 
+               (format nil "{~{\"~(~a~)\":\"~a\"~^,~}}"
+                       (loop for k being the hash-keys in row
+                          using (hash-value v)
+                          appending (list k v))))))
+
+(defun hash-list-to-json-objects (hash-list &optional file)
+  (let ((data (format nil "~{~a~%~}"
+                      (loop for row in hash-list collect
+                           (format nil "{~{\"~(~a~)\":\"~a\"~^,~}}"
+                                   (loop for k being the hash-keys in row
+                                      using (hash-value v)
+                                      appending (list k v)))))))
+    (if file
+        (with-open-file (s file :direction :output :if-exists :supersede)
+          (write-string data s))
+        data)))
+        
 (defun hash-list-rename-columns (hash-list &rest old-new)
   (unless (zerop (mod (length old-new) 2))
     (error "old-new must be an even number of parameters."))
