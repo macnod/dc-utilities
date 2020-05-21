@@ -55,6 +55,8 @@
    hash-list-first-index-of
    hash-list-first-record-of
    hash-list-from-csv
+   hash-list-from-json-objects
+   hash-list-from-json-objects-file
    hash-list-from-list
    hash-list-from-plists
    hash-list-keys
@@ -138,7 +140,7 @@
    thread-pool-time-to-go
    time-to-go
    time-zone-to-int
-   timestamp
+   dc-timestamp
    to-ascii
    trim
    uint-to-bytes

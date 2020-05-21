@@ -78,11 +78,11 @@
                (map 'string (lambda (c) (if (> (char-code c) 127) #\Space c)) a)
                (format nil "~a" a)))))
 
-(defun timestamp (&key
-                    (time (get-universal-time))
-                    string
-                    time-zone
-                    (format "Y-M-DTh:m:s"))
+(defun dc-timestamp (&key
+                       (time (get-universal-time))
+                       string
+                       time-zone
+                       (format "Y-M-DTh:m:s"))
   "Returns the given time (or the current time) formatted according to the FORMAT parameter, followed by an optional value for STRING.  If STRING is provided, the function adds a space to the result and then appends the string to that.  The FORMAT string can contain any characters.  This function will replace the format characters Y, M, D, h, m, and s, respectively, with numbers representing the year,month, day, hour, minute, and second.  All the numbers are 2 digits long, except for the year, which is 4 digits long."
   (multiple-value-bind (second minute hour day month year)
       (decode-universal-time time time-zone)
@@ -102,7 +102,7 @@
 
 (defun log-entry (&rest messages)
   "Accepts one or more strings, concatenates them, precedes the result with a timestamp, and returns a string that looks like a log entry."
-  (timestamp :string (format nil "~{~a~}~%" messages)))
+  (dc-timestamp :string (format nil "~{~a~}~%" messages)))
 
 (defun write-log-entry (stream &rest messages)
   "Accepts one or more strings, concatenates them, precedes the result with a timestamp, and writes a string that looks like a lo
@@ -1312,11 +1312,12 @@ or like this:
                               appending (list a b))))
     hash-list))
 
-
-(defun hash-list-from-json-objects-file (file)
+(defun hash-list-from-json-objects-file (file &key limit)
   (with-open-file (s file)
     (loop for line = (read-line s nil)
-       while line collect line into lines
+       for line-number = 0 then (1+ line-number)
+       while (and line (if limit (< line-number limit) t))
+       collect line into lines
        finally (return (hash-list-from-json-objects 
                         (format nil "~{~a~^~%~}" lines))))))
 
@@ -1604,13 +1605,13 @@ or like this:
          (rt (max (- tt et) 0))
          (eta (+ start tt)))
     (format stream "~a ~a/~a (~,2f%) et=~,2fh rt=~,2fh eta=~a~%"
-            (timestamp)
+            (dc-timestamp)
             count
             max
             percent-done
             (/ (float et) 3600)
             (/ (float rt) 3600)
-            (timestamp :time (truncate eta) :format "h:m:s"))))
+            (dc-timestamp :time (truncate eta) :format "h:m:s"))))
 
 (defmacro chart (&body chart-spec)
   (let* ((filename (unique-file-name)))
