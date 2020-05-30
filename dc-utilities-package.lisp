@@ -100,6 +100,9 @@
    plist-keys
    plist-list-to-csv
    plist-values
+   primep
+   prime-factors
+   prime-game
    qsort
    range
    read-one-line

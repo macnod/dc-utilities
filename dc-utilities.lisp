@@ -31,6 +31,8 @@
 (defparameter *tz-names* (make-hash-table :test 'equal))
 (defparameter *tz-names-plist*
   '("UTC" 0 "GMT" 0 "PST" -8 "IST" 5.5 "EST" -5 "CST" -6))
+(defparameter *hprimes* (make-hash-table :size 78498))
+(defparameter *aprimes* (make-array 78498 :element-type 'integer))
 
 (loop for (tz offset) on *tz-names-plist* by #'cddr
      do (setf (gethash tz *tz-names*) offset))
@@ -1306,8 +1308,8 @@ or like this:
                        collect record))
          (old-keys (hash-list-keys hash-list))
          (new-keys (mapcar (lambda (k) (string-to-keyword k)) old-keys)))
-    (apply #'hash-list-rename-columns 
-           (cons hash-list (loop for a in old-keys 
+    (apply #'hash-list-rename-columns
+           (cons hash-list (loop for a in old-keys
                               for b in new-keys
                               appending (list a b))))
     hash-list))
@@ -1318,7 +1320,7 @@ or like this:
        for line-number = 0 then (1+ line-number)
        while (and line (if limit (< line-number limit) t))
        collect line into lines
-       finally (return (hash-list-from-json-objects 
+       finally (return (hash-list-from-json-objects
                         (format nil "~{~a~^~%~}" lines))))))
 
 (defun hash-list-to-plists (hash-list)
@@ -1363,7 +1365,7 @@ or like this:
 
 (defun hash-list-to-json (hash-list)
   (format nil "[~{~a~^,~}]"
-          (loop for row in hash-list collect 
+          (loop for row in hash-list collect
                (format nil "{~{\"~(~a~)\":\"~a\"~^,~}}"
                        (loop for k being the hash-keys in row
                           using (hash-value v)
@@ -1380,7 +1382,7 @@ or like this:
         (with-open-file (s file :direction :output :if-exists :supersede)
           (write-string data s))
         data)))
-        
+
 (defun hash-list-rename-columns (hash-list &rest old-new)
   (unless (zerop (mod (length old-new) 2))
     (error "old-new must be an even number of parameters."))
@@ -1491,16 +1493,16 @@ or like this:
      for hash in hash-list
      do (loop for k being the hash-keys in hash
            do (incf (gethash k counts 0)))
-     finally 
-       (return 
+     finally
+       (return
          (list :list-size target-count
-               :stray-keys 
-               (loop for k being the hash-keys in counts 
+               :stray-keys
+               (loop for k being the hash-keys in counts
                   using (hash-value v)
                   when (not (= (gethash k counts) target-count))
-                  collect (list :key k 
+                  collect (list :key k
                                 :records (gethash k counts)))))))
-  
+
 (defun qsort (sequence predicate &key (key 'identity))
   "Non-destructive Quicksort.  The sequence, predicate, and key parameters are the same as in the Common Lisp sort function."
   (when sequence
@@ -1615,10 +1617,44 @@ or like this:
 
 (defmacro chart (&body chart-spec)
   (let* ((filename (unique-file-name)))
-    `(progn (with-gchart 
+    `(progn (with-gchart
                 ,@chart-spec
               (add-features :transparent-background :label)
               (save-file ,filename))
             (swank:eval-in-emacs
              `(slime-media-insert-image (create-image ,,filename) ,,filename))
             (delete-file ,filename))))
+
+(defun prime-factors (x)
+  (if (primep x)
+      (list x)
+      (loop for a from 2 to (/ x 2)
+         when (zerop (mod x a))
+         do (return (append (prime-factors a) (prime-factors (/ x a)))))))
+
+(defun prime-game ()
+  (let ((max (truncate 1e6)))
+    (when (zerop (hash-table-count *hprimes*))
+      (loop for prime in (range 1 max :filter #'primep)
+         for index = 0 then (1+ index)
+         do
+           (setf (gethash prime *hprimes*) t)
+           (setf (aref *aprimes* index) prime)))
+    (loop
+       for want-prime = (not (zerop (random 2)))
+       for question = (if want-prime
+                          (aref *aprimes* (random (length *aprimes*)))
+                          (loop for x = (1+ (random max))
+                             while (or (evenp x) (gethash x *hprimes*))
+                             finally (return x)))
+       for answer = (progn (format t "~d prime (y/n/q)? " question)
+                           (read-line))
+       for correct-answer = (if want-prime "y" "n")
+       while (not (equal answer "q"))
+       do (format t "~a. ~d is ~a.~%~%"
+                  (if (equal answer correct-answer) "Correct" "Fail")
+                  question
+                  (if want-prime
+                      "prime"
+                      (format nil "not prime (~{~a~^ X ~})"
+                              (prime-factors question)))))))
