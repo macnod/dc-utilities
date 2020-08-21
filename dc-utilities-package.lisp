@@ -12,6 +12,9 @@
    *ds-timings*
    alist-to-plist
    alist-values
+   all-permutations
+   all-permutations-of-string
+   existing-permutations-of-string
    aws-load-settings
    aws-setting
    bytes-to-uint
