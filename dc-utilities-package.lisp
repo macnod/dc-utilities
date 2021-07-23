@@ -107,7 +107,7 @@
    prime-factors
    prime-game
    qsort
-   range
+   numeric-range
    read-one-line
    read-settings-file
    replace-extension

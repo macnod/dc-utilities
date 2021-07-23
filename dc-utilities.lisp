@@ -763,7 +763,7 @@ or like this:
 (defun distinct-values (list)
   (distinct-elements list))
 
-(defun range (start end &key (step 1) (filter #'identity) shuffle)
+(defun numeric-range (start end &key (step 1) (filter #'identity) shuffle)
   "Returns a list of values between START and END (inclusive), skipping values by STEP, filtering remaining values with the function in FILTER, and shuffling the remaining values if SHUFFLE is true.  STEP defaults to 1, FILTER defaults to allowing all values through, and SHUFFLE default to nil."
   (let ((range (loop for a from start to end by step
                   when (funcall filter a) collect a)))
