@@ -1,8 +1,7 @@
 ;;;; package.lisp
 
 (defpackage :dc-utilities
-  (:use :cl :cl-ppcre :trivial-utf-8 :sb-thread :sb-ext :cl-csv
-        :vecto :adw-charting)
+  (:use :cl :cl-ppcre :trivial-utf-8 :sb-thread :sb-ext :cl-csv)
   (:import-from :ironclad
                 :ascii-string-to-byte-array
                 :byte-array-to-hex-string
@@ -72,6 +71,7 @@
    hash-string
    hash-to-list
    hash-to-plist
+   hash-to-string
    hash-values
    hashify-list
    home-based
@@ -119,6 +119,8 @@
    setting
    setting
    shell-execute
+   shell-to-list
+   shell-to-list-default
    shift
    shuffle
    slurp
@@ -158,4 +160,5 @@
    unshift
    verify-string
    with-lines-in-file
+   write-log-entry
    ))

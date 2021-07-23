@@ -161,6 +161,30 @@ g entry to the given stream."
                               :error error-stream
                               :input input-stream))))))
 
+(defun shell-to-list (&rest program)
+  (let* ((error-string nil)
+	 (output-string (with-output-to-string (out)
+			  (setf error-string
+				(with-output-to-string (err)
+				  (uiop:run-program
+				   (format nil "~{~a~^ ~}" program) 
+				   :output out 
+				   :error-output err
+				   :ignore-error-status t))))))
+    (values (split #\Newline output-string) 
+	    (unless (zerop (length error-string)) error-string))))
+
+(defun shell-to-list-default (default &rest program)
+  (multiple-value-bind (out err)
+      (apply #'shell-to-list program)
+    (values (if err default out) err)))
+
+(defun shell-to-list-debug (&rest program)
+  (let ((program (format nil "~{~a~^ ~}" program)))
+    (format t "~a~%" program)
+    (split #\Newline (with-output-to-string (out)
+		       (uiop:run-program program :output out)))))
+
 (defun file-line-count (filename)
   "Obtain a count of the lines in the file FILENAME using the Linux wc program."
   (values (parse-integer
@@ -268,12 +292,13 @@ g entry to the given stream."
                      (string-right-trim (nreverse eol)
                                         (coerce (nreverse chars) 'string)))))))
 
-(defun spew (string filename &key create-directories append)
+(defun spew (string filename &key create-directories)
   "Writes the contents of STRING to the file specified by FILENAME.  Use the CREATE-DIRECTORIES parameter if any of the directories in the path in FILENAME don't exist and you want to create them.  Use the APPEND parameter if you want to append STRING to an existing file."
   (when create-directories
     (create-directory (directory-namestring filename) :with-parents t))
   (with-open-file (stream filename :direction :output :if-exists :supersede)
-    (write-string string stream)))
+    (write-string string stream))
+  nil)
 
 (defun slurp-n-thaw (filename)
   "Reads and brings to life serialized objects from the file FILENAME."
@@ -288,11 +313,12 @@ g entry to the given stream."
   "Returns the length of the file FILENAME."
   (with-open-file (f filename) (file-length f)))
 
-(defun unique-file-name (&key (directory "/tmp") (extension ".tmp"))
-  "Returns a made-up, unique file name.  DIRECTORY defaults to /tmp and EXTENSION to .tmp."
+(defun unique-file-name (&key (directory "/tmp") (prefix "") (extension ".tmp"))
+  "Returns a made-up, unique file name.  DIRECTORY defaults to /tmp, prefix to '', and EXTENSION to .tmp."
   (join-paths
    directory
-   (format nil "~a~a"
+   (format nil "~a~a~a"
+	   prefix
            (unique-name)
            (if (scan "^\\." extension)
                extension
@@ -420,9 +446,13 @@ this function returns a list of named parameters that excludes the names (and th
 
 (defun list-values (plist) (plist-values plist))
 
-(defun hash-keys (hash)
+(defun hash-keys (hash &optional sort-predicate)
   "Returns a list of all the keys in HASH, which is a hash table."
-  (loop for a being the hash-keys in hash collect a))
+  (loop for a being the hash-keys in hash 
+     collect a into keys
+     finally (if sort-predicate
+                 (sort keys sort-predicate)
+                 keys)))
 
 (defun hash-values (hash)
   "Returns a list of all the values in HASH, which is a hash table."
@@ -1074,7 +1104,10 @@ or like this:
                         tag
                         (format nil "~a-~a"
                             (sb-thread:thread-name sb-thread:*current-thread*)
-                            tag))))
+                            tag)))
+         (mark (with-locked-hash-table (time-tracker)
+                 (gethash mark-name time-tracker))))
+    (when (null mark) (error "Unknown tag :~(~a~).  Call mark-time with this tag first." tag))
     (/ (- (get-internal-real-time)
           (with-locked-hash-table (time-tracker)
             (gethash mark-name time-tracker)))
@@ -1218,10 +1251,22 @@ key, and the existing value)."
                  do (setf (gethash k-clean h) value-new))))
     h))
 
-(defun hash-to-list (hash)
+(defun hash-to-string (hash &key values-first (separator " "))
+  (when hash
+    (loop for key in (sort (loop for key being the hash-key in hash collect key) #'string<)
+       for value = (gethash key hash)
+       for format-string = (concatenate 'string "~{~a~^" separator "~}")
+       collect (format nil format-string (if values-first 
+                                             (list value key) 
+                                             (list key value)))
+       into lines
+       finally (return (format nil "~{~a~%~}" lines)))))
+
+
+(defun hash-to-list (hash &key values-first)
   (when hash
     (loop for k being the hash-keys in hash using (hash-value v)
-       collect (list k v))))
+       collect (if values-first (list v k) (list k v)))))
 
 (defun hash-to-plist (hash)
   (when hash
@@ -1244,18 +1289,18 @@ key, and the existing value)."
                   (return c))
      collect (elt list b)))
 
-(defun index-of-max (list)
-  (if (arrayp list)
-      (loop for index from 0 below (length list)
-         for item across list
-         for max-index = 0 then (if (> item max) index max-index)
-         for max = item then (if (> item max) item max)
-         finally (return max-index))
-      (loop for index from 0 below (length list)
-         for item in list
-         for max-index = 0 then (if (> item max) index max-index)
-         for max = item then (if (> item max) item max)
-         finally (return max-index))))
+(defgeneric index-of-max (vector)
+  (:method ((vector vector))
+    (index-of-max (map 'list 'identity vector)))
+  (:method ((vector list))
+    (loop with max-index = 0 and max-value = (elt vector 0)
+       for value in vector
+       for index = 0 then (1+ index)
+       when (> value max-value)
+       do 
+         (setf max-index index)
+         (setf max-value value)
+       finally (return max-index))))
 
 (defun string-to-keyword (string &optional (clean t))
   (let ((s (if clean
@@ -1475,7 +1520,8 @@ key, and the existing value)."
 
 (defun hash-list-filter (hash-list &rest filters)
   "This function accepts a hash-list and multiple filters.  The return value consists of a list of items from the hash-list that pass all the filters.  If you want items that pass one condition or another, then you have to create a filter that implements that or operation.  Each filter must be a key/value pair or a function.  A key/value pair filter must be expressed as a list with 2 items: key and value.  A function filter can be a reference to a function or a lambda.  These must accept the zero-based index of the hash table in hash-list and the hash-table itself.  The signature of a function filter is: lambda (index hash-table).  The function filter must return true, to indicate that the hash table passes the filter, or nil otherwise."
-  (loop with functions = (remove-if-not #'functionp filters)
+  (loop 
+     with functions = (remove-if-not #'functionp filters)
      with closures =
        (loop for condition in (remove-if #'functionp filters)
           unless (member (car condition)
@@ -1646,16 +1692,6 @@ key, and the existing value)."
             (/ (float et) 3600)
             (/ (float rt) 3600)
             (dc-timestamp :time (truncate eta) :format "h:m:s"))))
-
-;; (defmacro chart (&body chart-spec)
-;;   (let* ((filename (unique-file-name)))
-;;     `(progn (with-gchart
-;;                 ,@chart-spec
-;;               (add-features :transparent-background :label)
-;;               (save-file ,filename))
-;;             (swank:eval-in-emacs
-;;              `(slime-media-insert-image (create-image ,,filename) ,,filename))
-;;             (delete-file ,filename))))
 
 (defun prime-factors (x)
   (if (primep x)
