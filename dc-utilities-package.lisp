@@ -110,6 +110,7 @@
    numeric-range
    read-one-line
    read-settings-file
+	 replace-all-in-string
    replace-extension
    replace-regexs
    report-progress

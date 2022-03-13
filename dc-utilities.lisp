@@ -147,6 +147,22 @@ g entry to the given stream."
        string)
     (and a b (zerop a) (= b (length string)))))
 
+(defun replace-all-in-string (string part replacement)
+  "Returns a new string created by replacing each occurrence of the part 
+parameter (a string) with the value of the replacement parameter (another 
+string)."
+  (with-output-to-string (out)
+    (loop with part-length = (length part)
+			 for old-pos = 0 then (+ pos part-length)
+			 for pos = (search part string
+												 :start2 old-pos
+												 :test #'char=)
+			 do (write-string string out
+												:start old-pos
+												:end (or pos (length string)))
+			 when pos do (write-string replacement out)
+			 while pos)))
+
 (defun shell-execute (program &optional parameters (input-pipe-data ""))
   "Run PROGRAM and return the output of the program as a string.  You can pass an atom or a list for PARAMETERS (the command-line options for the program). You can also pipe data to the program by passing the INPUT-PIPE-DATA parameter with a string containing the data you want to pipe.  The INPUT-PIPE-DATA parameter defaults to the empty string."
   (let ((parameters (cond ((null parameters) nil)
@@ -295,7 +311,7 @@ g entry to the given stream."
 (defun spew (string filename &key create-directories)
   "Writes the contents of STRING to the file specified by FILENAME.  Use the CREATE-DIRECTORIES parameter if any of the directories in the path in FILENAME don't exist and you want to create them.  Use the APPEND parameter if you want to append STRING to an existing file."
   (when create-directories
-    (create-directory (directory-namestring filename) :with-parents t))
+		(ensure-directories-exist filename))
   (with-open-file (stream filename :direction :output :if-exists :supersede)
     (write-string string stream))
   nil)
@@ -345,6 +361,11 @@ g entry to the given stream."
 (defun trim (s &optional (fat "^\\s+|\\s+$"))
   "Trim FAT from the string in S.  The FAT parameter is optional and defaults to \"^\\s+|\\s+$\", which means \"Whitespace at the beginning or end of the string\"."
   (regex-replace-all fat s ""))
+
+(defun trim-whitespace (s)
+	(string-trim '(#\Space #\Newline #\Backspace #\Tab #\Linefeed #\Page #\Return 
+								 #\Rubout)
+							 s))
 
 (defun flatten (l)
   "Given a nested list L, return a flat list."
@@ -404,12 +425,6 @@ g entry to the given stream."
     ((zerop x) 0)
     ((= x 1) 1)
     (t (+ (fib (1- x)) (fib (- x 2))))))
-
-(defun primep (x)
-  (cond ((< x 2) nil)
-        ((= x 2) t)
-        ((zerop (mod x 2)) nil)
-        (t (loop for a from 3 to (sqrt x) by 2 never (zerop (mod x a))))))
 
 (defun alist-values (alist &rest keys)
   "Returns the values associated with KEYS in ALIST.  ALIST is an associative list."
@@ -827,8 +842,9 @@ or like this:
    (lambda ()
      (let* ((fn-collect
              (lambda (x)
-               (setf (getf *dc-thread-pool-collector* pool-name)
-                     (cons x (getf *dc-thread-pool-collector* pool-name)))))
+							 (let ((collection (getf *dc-thread-pool-collector* pool-name)))
+								 (setf (getf *dc-thread-pool-collector* pool-name)
+											 (cons x collection)))))
             (fn-get-next-job
              (if (eql (type-of job-queue) 'function)
                  job-queue
@@ -859,7 +875,7 @@ or like this:
                                            fn-check-done)
                                :name name))))
        (loop for thread in threads do (sb-thread:join-thread thread))))
-     :name (format nil "~a-000" pool-name)))
+	 :name (format nil "~a-000" pool-name)))
 
 (defun thread-pool-init-variables (pool-name)
   (setf (getf *dc-thread-pool-progress* pool-name) 0
@@ -906,13 +922,15 @@ or like this:
                        (sb-thread:list-all-threads))
      while threads do
        (loop for thread in threads
-          do (sb-thread:terminate-thread thread))
+          do (ignore-errors (sb-thread:terminate-thread thread)))
        (sleep 3)
      finally (sb-thread:list-all-threads)))
 
 (defun thread-pool-result (pool-name)
-  (with-mutex ((getf *dc-thread-pool-collector-mutex* pool-name))
-    (getf *dc-thread-pool-collector* pool-name)))
+	(let ((mutex (getf *dc-thread-pool-collector-mutex* pool-name)))
+		(when mutex
+			(with-mutex (mutex)
+				(getf *dc-thread-pool-collector* pool-name)))))
 
 ;;
 ;; Math
@@ -1342,7 +1360,7 @@ key, and the existing value)."
                    (headers-in-file
                     (mapcar (lambda (k) (string-to-keyword k clean-headers))
                             (car rows)))
-                   (t (range 0 (1- (length (car rows))))))))
+                   (t (numeric-range 0 (1- (length (car rows))))))))
     (when (not (= (length (distinct-elements fields))
                   (length fields)))
       (setf fields
@@ -1521,16 +1539,15 @@ key, and the existing value)."
 (defun hash-list-filter (hash-list &rest filters)
   "This function accepts a hash-list and multiple filters.  The return value consists of a list of items from the hash-list that pass all the filters.  If you want items that pass one condition or another, then you have to create a filter that implements that or operation.  Each filter must be a key/value pair or a function.  A key/value pair filter must be expressed as a list with 2 items: key and value.  A function filter can be a reference to a function or a lambda.  These must accept the zero-based index of the hash table in hash-list and the hash-table itself.  The signature of a function filter is: lambda (index hash-table).  The function filter must return true, to indicate that the hash table passes the filter, or nil otherwise."
   (loop 
+		 with keys = (hash-keys (car hash-list))
      with functions = (remove-if-not #'functionp filters)
      with closures =
        (loop for condition in (remove-if #'functionp filters)
-          unless (member (car condition)
-                           (hash-keys (car hash-list))
-                           :test 'equal)
-            do (error "The key ~a is not present in the given hash list."
-                      (car condition))
-          collect (let ((key (car condition))
-                        (value (second condition)))
+          when (not (member (car condition) keys :test 'equal))
+					do (error "The key ~a is not present in the given hash list."
+										(car condition))
+          collect (let* ((key (car condition))
+												 (value (second condition)))
                     (lambda (i x)
                       (declare (ignore i))
                       (equal (gethash key x) value))))
@@ -1693,17 +1710,30 @@ key, and the existing value)."
             (/ (float rt) 3600)
             (dc-timestamp :time (truncate eta) :format "h:m:s"))))
 
+(defun primep (n)
+  (cond ((< n 2) nil)
+				((< n 4) t)
+				((or (zerop (mod n 2)) (zerop (mod n 3))) nil)
+				(t (loop for a from 5 to (sqrt n) by 6
+								never (or (zerop (mod n a)) (zerop (mod n (+ a 2))))))))
+
+(defun next-prime (n)
+	(if (< n 2)
+			2
+		(loop for a = (if (evenp n) (1+ n) (+ n 2)) then (+ a 2)
+					when (primep a) return a)))
+
 (defun prime-factors (x)
   (if (primep x)
       (list x)
-      (loop for a from 2 to (/ x 2)
-         when (zerop (mod x a))
-         do (return (append (prime-factors a) (prime-factors (/ x a)))))))
+    (loop for a from 2 to (/ x 2)
+          when (zerop (mod x a))
+          do (return (append (prime-factors a) (prime-factors (/ x a)))))))
 
 (defun prime-game ()
   (let ((max (truncate 1e6)))
     (when (zerop (hash-table-count *hprimes*))
-      (loop for prime in (range 1 max :filter #'primep)
+      (loop for prime in (numeric-range 1 max :filter #'primep)
          for index = 0 then (1+ index)
          do
            (setf (gethash prime *hprimes*) t)
