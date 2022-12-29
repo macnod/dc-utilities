@@ -1537,26 +1537,20 @@ key, and the existing value)."
     (when index (elt hash-list index))))
 
 (defun hash-list-filter (hash-list &rest filters)
-  "This function accepts a hash-list and multiple filters.  The return value consists of a list of items from the hash-list that pass all the filters.  If you want items that pass one condition or another, then you have to create a filter that implements that or operation.  Each filter must be a key/value pair or a function.  A key/value pair filter must be expressed as a list with 2 items: key and value.  A function filter can be a reference to a function or a lambda.  These must accept the zero-based index of the hash table in hash-list and the hash-table itself.  The signature of a function filter is: lambda (index hash-table).  The function filter must return true, to indicate that the hash table passes the filter, or nil otherwise."
+  "This function accepts HASH-LIST and multiple FILTERS. HASH-LIST is a list of hash-table objects. The return value consists of a list of items from the HASH-LIST that pass all the functions in FILTERS.  If you want HASH-LIST-FILTER to return items that pass one condition or another, then you have to include a function in FILTERS that implements that OR operation.  Each filter must be a key/value pair or a function.  A key/value pair filter must be expressed as a list with 2 items: key and value.  A function filter can be a reference to a function or a lambda.  To serve as a function filter, the function must accept the zero-based index of the hash table in HASH-LIST and the hash-table itself.  The signature of a function filter is: LAMBDA (INDEX HASH-TABLE) -> T.  The function filter must return T, to indicate that the hash table passes the filter, or nil otherwise."
   (loop 
-		 with keys = (hash-keys (car hash-list))
-     with functions = (remove-if-not #'functionp filters)
-     with closures =
-       (loop for condition in (remove-if #'functionp filters)
-          when (not (member (car condition) keys :test 'equal))
-					do (error "The key ~a is not present in the given hash list."
-										(car condition))
-          collect (let* ((key (car condition))
-												 (value (second condition)))
-                    (lambda (i x)
-                      (declare (ignore i))
-                      (equal (gethash key x) value))))
-     with conditions = (concatenate 'list functions closures)
-     for hash-table in hash-list
-     for index = 0 then (1+ index)
-     when (loop for c in conditions
-             always (funcall c index hash-table))
-     collect hash-table))
+		with keys = (hash-keys (car hash-list))
+    and functions = (remove-if-not #'functionp filters)
+    with closures = (loop for condition in (remove-if #'functionp filters)
+                          when (not (member (car condition) keys :test
+                                      (declare (ignore i))
+                                      (equal (gethash key x) value))))
+    with conditions = (concatenate 'list functions closures)
+    for hash-table in hash-list
+    for index = 0 then (1+ index)
+    when (loop for c in conditions
+               always (funcall c index hash-table))
+      collect hash-table))
 
 (defun hash-list-set (hash-list set &rest filters)
   "This function accepts a hash-list, a function that sets fields in each selected hash table, and one or more filters to select the hash tables that need the update.  The filters parameter works just like the filters parameter in the hash-list-filter.  The set function accepts 2 parameters: selection-index and hash-table.  The selection-index value is the index of the hash table in the selected subset of hash-list.  The hash-table value is the hash-list hash table that the function will change.  The function can change any field in the hash table, but should avoid adding or removing fields, because a hash-list works best when all the hash tables in the list have the same fields.  This function also allows you to pass a list for the set parameter instead of a function.  If you do that, then the list is a plist with key value pairs, where each key exists in every hash-list record and each corresponding value is the new value that this function will assign to that key in each of the selected hash tables."
@@ -1618,25 +1612,32 @@ key, and the existing value)."
               (list pivot)
               (qsort greater predicate :key key)))))
 
-(defun partition-by-lambdas (sequence lambdas &key other exclusive)
+(defun partition-by-lambdas (sequence lambdas &key exclusive)
+  "Returns PARTITIONS, a list of lists, with each list corresponding to a partition associated with a function in LAMBDAS.  Each list is a partition of SEQUENCE.  When a function from LAMBDAS returns T for an item of sequence, that item goes into the partition that corresponds to the function.  The number of partitions is the number of LAMBDAS + 1.  The partitions are in the same order as the functions in LAMBDAS, with an additional partition for non-classified items at the end of PARTITIONS.  An item from SEQUENCE can land in more than one partition, unless EXCLUSIVE is T, in which case the item will go into a single partition, even if more than one function from LAMBDAS returns T for the item. The item will go into the partition of the first function that returns T for the item."
   (loop
-     with functions = (if (listp lambdas) lambdas (list lambdas))
-     with result = (make-list (length functions))
-     with unclassified = nil
-     with list = (if (listp sequence)
-                     sequence
-                     (map 'vector 'identity sequence))
-     for item in list
-     do (loop for lambda in functions
-           for index = 0 then (1+ index)
-           if (funcall lambda item)
-             do (push item (elt result index))
-             and when exclusive do (return) end
-           else
-             when other do (push item unclassified))
-     finally
-       (return (mapcar (lambda (r) (reverse r))
-                       (append result (list unclassified))))))
+    with partition-count = (1+ (length lambdas))
+    with result = (make-list partition-count)
+    with list = (if (listp sequence)
+                    sequence
+                    (map 'list 'identity sequence))
+    for item in list
+    do (loop with found = nil
+             for lambda in lambdas
+             for index from 0 below (1- partition-count)
+             when (funcall lambda item) do
+               (push item (elt result index))
+               (setf found t)
+             when (and exclusive found) do (return)
+               finally (progn
+                         (unless found 
+                           (push item (elt result (1- partition-count))))
+                         (return)))
+    finally
+       (return (mapcar (lambda (r) (nreverse r)) 
+                       (if (null (car (last result)))
+                           (butlast result)
+                           result)))))
+         
 
 (defun partition-by-size (sequence cell-size)
   (let ((list (if (vectorp sequence)
