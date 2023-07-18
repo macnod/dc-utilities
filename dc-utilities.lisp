@@ -216,9 +216,11 @@ string)."
 
 (defun join-paths (&rest path-parts)
   "Joins elements of PATH-PARTS into a file path, inserting slashes where necessary."
-  (let ((path (format nil "~{~a~^/~}"
-                      (loop for part in path-parts collect
-                           (regex-replace-all "^/|/$" part "")))))
+  (let* ((path-parts (mapcar (lambda (s) (if (stringp s) s (format nil "~a" s)))
+                             path-parts))
+         (path (format nil "~{~a~^/~}"
+                       (loop for part in path-parts 
+                             collect (regex-replace-all "^/|/$" part "")))))
     (format nil "~a~a"
             (if (verify-string (car path-parts) "^/.*$") "/" "")
             path)))
@@ -384,9 +386,14 @@ string)."
 (defun shuffle (seq)
   "Return a sequence with the same elements as the given sequence S, but in random order (shuffled)."
   (loop
-     with l = (length seq) with w = (make-array l :initial-contents seq)
-     for i from 0 below l for r = (random l) for h = (aref w i)
-     do (setf (aref w i) (aref w r)) (setf (aref w r) h)
+     with l = (length seq) 
+     with w = (make-array l :initial-contents seq)
+     for i from 0 below l 
+     for r = (random l) 
+     for h = (aref w i)
+     do 
+       (setf (aref w i) (aref w r)) 
+       (setf (aref w r) h)
      finally (return (if (listp seq) (map 'list 'identity w) w))))
 
 (defun memoize (function-symbol)
@@ -658,7 +665,7 @@ or like this:
             with ds-new = nil
             for i from 0 below (length ds)
             do (push (ds-clone (elt ds i)) ds-new)
-            finally (return ds-new))
+            finally (return (reverse ds-new)))
          (loop
             with l = (length ds)
             with ds-new = (make-array l)
