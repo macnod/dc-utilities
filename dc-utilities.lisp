@@ -1543,32 +1543,32 @@ key, and the existing value)."
                       (cons hash-list key-value-pairs))))
     (when index (elt hash-list index))))
 
-(defun hash-list-filter (hash-list &rest filters)
-  "This function accepts HASH-LIST and multiple FILTERS. HASH-LIST is a list of hash-table objects. The return value consists of a list of items from the HASH-LIST that pass all the functions in FILTERS.  If you want HASH-LIST-FILTER to return items that pass one condition or another, then you have to include a function in FILTERS that implements that OR operation.  Each filter must be a key/value pair or a function.  A key/value pair filter must be expressed as a list with 2 items: key and value.  A function filter can be a reference to a function or a lambda.  To serve as a function filter, the function must accept the zero-based index of the hash table in HASH-LIST and the hash-table itself.  The signature of a function filter is: LAMBDA (INDEX HASH-TABLE) -> T.  The function filter must return T, to indicate that the hash table passes the filter, or nil otherwise."
-  (loop 
-		with keys = (hash-keys (car hash-list))
-    and functions = (remove-if-not #'functionp filters)
-    with closures = (loop for condition in (remove-if #'functionp filters)
-                          when (not (member (car condition) keys :test
-                                      (declare (ignore i))
-                                      (equal (gethash key x) value))))
-    with conditions = (concatenate 'list functions closures)
-    for hash-table in hash-list
-    for index = 0 then (1+ index)
-    when (loop for c in conditions
-               always (funcall c index hash-table))
-      collect hash-table))
+;; (defun hash-list-filter (hash-list &rest filters)
+;;   "This function accepts HASH-LIST and multiple FILTERS. HASH-LIST is a list of hash-table objects. The return value consists of a list of items from the HASH-LIST that pass all the functions in FILTERS.  If you want HASH-LIST-FILTER to return items that pass one condition or another, then you have to include a function in FILTERS that implements that OR operation.  Each filter must be a key/value pair or a function.  A key/value pair filter must be expressed as a list with 2 items: key and value.  A function filter can be a reference to a function or a lambda.  To serve as a function filter, the function must accept the zero-based index of the hash table in HASH-LIST and the hash-table itself.  The signature of a function filter is: LAMBDA (INDEX HASH-TABLE) -> T.  The function filter must return T, to indicate that the hash table passes the filter, or nil otherwise."
+;;   (loop 
+;; 		with keys = (hash-keys (car hash-list))
+;;     and functions = (remove-if-not #'functionp filters)
+;;     with closures = (loop for condition in (remove-if #'functionp filters)
+;;                           when (not (member (car condition) keys :test
+;;                                       (declare (ignore i))
+;;                                       (equal (gethash key x) value))))
+;;     with conditions = (concatenate 'list functions closures)
+;;     for hash-table in hash-list
+;;     for index = 0 then (1+ index)
+;;     when (loop for c in conditions
+;;                always (funcall c index hash-table))
+;;       collect hash-table))
 
-(defun hash-list-set (hash-list set &rest filters)
-  "This function accepts a hash-list, a function that sets fields in each selected hash table, and one or more filters to select the hash tables that need the update.  The filters parameter works just like the filters parameter in the hash-list-filter.  The set function accepts 2 parameters: selection-index and hash-table.  The selection-index value is the index of the hash table in the selected subset of hash-list.  The hash-table value is the hash-list hash table that the function will change.  The function can change any field in the hash table, but should avoid adding or removing fields, because a hash-list works best when all the hash tables in the list have the same fields.  This function also allows you to pass a list for the set parameter instead of a function.  If you do that, then the list is a plist with key value pairs, where each key exists in every hash-list record and each corresponding value is the new value that this function will assign to that key in each of the selected hash tables."
-  (loop for hash-table in (apply #'hash-list-filter (cons hash-list filters))
-     for index = 0 then (1+ index)
-     if (functionp set)
-     do (funcall set index hash-table)
-     else
-     do (loop for (key value) on set by #'cddr
-           do (setf (gethash key hash-table) value))
-     summing 1))
+;; (defun hash-list-set (hash-list set &rest filters)
+;;   "This function accepts a hash-list, a function that sets fields in each selected hash table, and one or more filters to select the hash tables that need the update.  The filters parameter works just like the filters parameter in the hash-list-filter.  The set function accepts 2 parameters: selection-index and hash-table.  The selection-index value is the index of the hash table in the selected subset of hash-list.  The hash-table value is the hash-list hash table that the function will change.  The function can change any field in the hash table, but should avoid adding or removing fields, because a hash-list works best when all the hash tables in the list have the same fields.  This function also allows you to pass a list for the set parameter instead of a function.  If you do that, then the list is a plist with key value pairs, where each key exists in every hash-list record and each corresponding value is the new value that this function will assign to that key in each of the selected hash tables."
+;;   (loop for hash-table in (apply #'hash-list-filter (cons hash-list filters))
+;;      for index = 0 then (1+ index)
+;;      if (functionp set)
+;;      do (funcall set index hash-table)
+;;      else
+;;      do (loop for (key value) on set by #'cddr
+;;            do (setf (gethash key hash-table) value))
+;;      summing 1))
 
 (defun hash-list-keys (hash-list)
   "This function returns a list of the keys that are present in every element of the list."
